@@ -1,6 +1,9 @@
 /aargrade
 /aargrade.exe
+/bin/
 /dist/
-/.aargrade/
+**/.aargrade/
+**/.gradle/
+**/build/
 *.test
 coverage.out

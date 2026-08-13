@@ -18,10 +18,13 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.24.x"
+          go-version: "1.25.x"
           cache: true
       - run: go test ./...
       - run: go vet ./...
+      - name: Scan reachable vulnerabilities
+        if: runner.os == 'Linux'
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
 
   gradle-smoke:
     runs-on: ubuntu-latest
@@ -40,7 +43,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.24.x"
+          go-version: "1.25.x"
           cache: true
       - uses: actions/setup-java@v5
         with:
@@ -56,3 +59,82 @@ jobs:
           AARGRADE_GRADLE_BIN: gradle
           AARGRADE_SMOKE_FIXTURE: ${{ matrix.fixture }}
         run: scripts/gradle-smoke.sh
+
+  public-example:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.25.x"
+          cache: true
+      - name: Run the read-only user demo
+        run: make demo
+      - name: Validate the public host lifecycle
+        run: go test ./tests/integration -run '^TestPublicExampleUserJourney$' -v
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Install Android SDK platform
+        run: sdkmanager "platforms;android-35"
+      - name: Build the public example AAR
+        run: make example-build
+      - name: Upload the public example AAR
+        uses: actions/upload-artifact@v7
+        with:
+          name: public-example-aar
+          path: examples/library-only/sdk/build/outputs/aar/sdk-release.aar
+          if-no-files-found: error
+
+  consumer-matrix:
+    needs: public-example
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cell: agp4-java
+            gradle: "6.7.1"
+            java: "11"
+            platform: "30"
+          - cell: agp4-kotlin
+            gradle: "6.7.1"
+            java: "11"
+            platform: "30"
+          - cell: agp9-java
+            gradle: "9.4.1"
+            java: "17"
+            platform: "35"
+          - cell: agp9-kotlin
+            gradle: "9.4.1"
+            java: "17"
+            platform: "35"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.25.x"
+          cache: true
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: ${{ matrix.gradle }}
+      - name: Install Android SDK platform
+        run: sdkmanager "platforms;android-${{ matrix.platform }}"
+      - name: Download the candidate AAR
+        uses: actions/download-artifact@v8
+        with:
+          name: public-example-aar
+          path: examples/library-only/sdk/build/outputs/aar
+      - name: Build candidate in the consumer cell
+        run: >-
+          go run ./cmd/aargrade matrix
+          --config aargrade.yml
+          --cell "${{ matrix.cell }}"
+          --java-home "${{ matrix.java }}=$JAVA_HOME"
+          --gradle-bin "${{ matrix.gradle }}=gradle"

@@ -1,0 +1,4 @@
+.aargrade/
+.gradle/
+**/build/
+local.properties

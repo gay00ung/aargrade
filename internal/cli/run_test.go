@@ -47,11 +47,37 @@ func TestDoctorInvalidProjectReturnsTwo(t *testing.T) {
 	}
 }
 
-func TestRoadmapCommandDoesNotPretendSuccess(t *testing.T) {
+func TestMCPHelpAndUnknownOperation(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	exitCode := Run([]string{"matrix"}, &stdout, &stderr, "test")
-	if exitCode != 2 || !bytes.Contains(stderr.Bytes(), []byte("not implemented")) {
+	exitCode := Run([]string{"mcp"}, &stdout, &stderr, "test")
+	if exitCode != 0 || !bytes.Contains(stdout.Bytes(), []byte("aargrade mcp serve")) || stderr.Len() != 0 {
 		t.Fatalf("exit code=%d stdout=%q stderr=%q", exitCode, stdout.String(), stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	exitCode = Run([]string{"mcp", "unknown"}, &stdout, &stderr, "test")
+	if exitCode != 2 || !bytes.Contains(stderr.Bytes(), []byte("unknown operation")) {
+		t.Fatalf("exit code=%d stdout=%q stderr=%q", exitCode, stdout.String(), stderr.String())
+	}
+}
+
+func TestPlanJSON(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"plan", "--project", fixturePath(t, "kotlin-library"), "--target-agp", "9.0.1", "--format", "json"}, &stdout, &stderr, "test")
+	if exitCode != 0 {
+		t.Fatalf("exit code=%d stderr=%q", exitCode, stderr.String())
+	}
+	var result struct {
+		SchemaVersion int   `json:"schemaVersion"`
+		Ready         bool  `json:"ready"`
+		Steps         []any `json:"steps"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("plan JSON: %v\n%s", err, stdout.String())
+	}
+	if result.SchemaVersion != 1 || !result.Ready || len(result.Steps) == 0 {
+		t.Fatalf("plan = %#v", result)
 	}
 }
 

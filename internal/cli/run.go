@@ -29,9 +29,14 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 		return runDoctor(args[1:], stdout, stderr, version)
 	case "host":
 		return runHost(args[1:], stdout, stderr)
-	case "plan", "verify", "matrix", "mcp":
-		_, _ = fmt.Fprintf(stderr, "aargrade: %s is a roadmap command and is not implemented in this build\n", args[0])
-		return 2
+	case "plan":
+		return runMigrationPlan(args[1:], stdout, stderr, version)
+	case "verify":
+		return runVerify(args[1:], stdout, stderr, version)
+	case "matrix":
+		return runMatrix(args[1:], stdout, stderr, version)
+	case "mcp":
+		return runMCP(args[1:], stdout, stderr, version)
 	default:
 		_, _ = fmt.Fprintf(stderr, "aargrade: unknown command %q\n\n", args[0])
 		printRootUsage(stderr)
@@ -229,10 +234,11 @@ Usage:
 Commands:
   doctor   Diagnose an Android Gradle project without writing to it
   host     Preview or manage an owned temporary application host
+  plan     Create a read-only, version-aware AGP migration plan
+  verify   Build or inspect an AAR and compare it with a baseline
+  matrix   Build an AAR in isolated Java and Kotlin consumer cells
+  mcp      Serve the CLI capabilities to MCP-compatible agents
   version  Print the CLI version
-
-Roadmap commands:
-  plan, verify, matrix, mcp
 
 Run "aargrade <command> --help" for command help.`)
 }

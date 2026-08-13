@@ -1,0 +1,36 @@
+schemaVersion: 1
+candidateAar: examples/library-only/sdk/build/outputs/aar/sdk-release.aar
+
+cells:
+  - name: agp4-java
+    agp: 4.2.2
+    gradle: 6.7.1
+    jdk: 11
+    compileSdk: 30
+    minSdk: 21
+    language: java
+
+  - name: agp4-kotlin
+    agp: 4.2.2
+    gradle: 6.7.1
+    jdk: 11
+    compileSdk: 30
+    minSdk: 21
+    language: kotlin
+    kotlin: 1.6.21
+
+  - name: agp9-java
+    agp: 9.2.0
+    gradle: 9.4.1
+    jdk: 17
+    compileSdk: 35
+    minSdk: 21
+    language: java
+
+  - name: agp9-kotlin
+    agp: 9.2.0
+    gradle: 9.4.1
+    jdk: 17
+    compileSdk: 35
+    minSdk: 21
+    language: kotlin
