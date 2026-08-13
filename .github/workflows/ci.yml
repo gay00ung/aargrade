@@ -29,6 +29,7 @@ jobs:
   gradle-smoke:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - fixture: gradle-smoke-agp4
@@ -49,11 +50,13 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ matrix.java }}
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+        with:
+          packages: "platform-tools platforms;android-${{ matrix.platform }}"
       - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: ${{ matrix.gradle }}
-      - name: Install Android SDK platform
-        run: sdkmanager "platforms;android-${{ matrix.platform }}"
       - name: Validate generated host with AGP
         env:
           AARGRADE_GRADLE_BIN: gradle
@@ -76,9 +79,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+        with:
+          packages: "platform-tools platforms;android-35"
       - uses: gradle/actions/setup-gradle@v6
-      - name: Install Android SDK platform
-        run: sdkmanager "platforms;android-35"
       - name: Build the public example AAR
         run: make example-build
       - name: Upload the public example AAR
@@ -121,11 +126,13 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ matrix.java }}
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+        with:
+          packages: "platform-tools platforms;android-${{ matrix.platform }}"
       - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: ${{ matrix.gradle }}
-      - name: Install Android SDK platform
-        run: sdkmanager "platforms;android-${{ matrix.platform }}"
       - name: Download the candidate AAR
         uses: actions/download-artifact@v8
         with:
