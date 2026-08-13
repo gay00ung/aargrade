@@ -1,0 +1,2 @@
+rootProject.name = 'aargrade-gradle-smoke-agp4'
+include 'sdk'

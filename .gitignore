@@ -1,0 +1,6 @@
+/aargrade
+/aargrade.exe
+/dist/
+/.aargrade/
+*.test
+coverage.out

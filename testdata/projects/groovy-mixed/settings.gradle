@@ -1,0 +1,2 @@
+rootProject.name = 'groovy-mixed-fixture'
+include 'app', 'sdk'
