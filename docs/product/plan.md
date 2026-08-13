@@ -1,5 +1,22 @@
 # AARGrade product and delivery plan
 
+## Implementation status (2026-08-13)
+
+- Milestone 1 is implemented: read-only diagnosis and ownership-safe host
+  preview/apply/removal.
+- Milestone 2 is implemented as a conservative first engine: version-aware
+  planning, wrapper-driven build evidence, bounded AAR inspection, JVM linkage,
+  metadata, Consumer R8, and JNI packaging comparison.
+- Milestone 3 is implemented and Gate D passed locally: the public AAR built in
+  AGP 4.2.2 and 9.2.0 Java/Kotlin consumers with explicit JDK 11/17. CI is
+  configured to repeat all four cells.
+- The MCP portion of Milestone 4 is implemented over the shared domain
+  operations and tested through real stdio negotiation. A Gradle plugin is not
+  implemented.
+- Upgrade Assistant UI Gates A and C and real external-user demand remain open.
+  Implementing the toolchain is not evidence that the market hypothesis is
+  already validated.
+
 ## Product contract
 
 ### Problem
@@ -35,19 +52,19 @@ AARGrade does not replace Android Studio's AGP Upgrade Assistant, Metalava,
 binary compatibility validators, Diffuse, Gradle, R8, or Android Lint. It will
 detect, invoke, and consolidate those tools where their contracts are stable.
 
-## Command roadmap
+## Command delivery status
 
-| Command | Outcome | Delivery gate |
+| Command | Outcome | Status |
 | --- | --- | --- |
-| `doctor` | Read-only inventory and migration-risk findings | Milestone 1 |
-| `host add/remove` | Reversible temporary application host with ownership proof | Milestone 1 |
-| `plan --target-agp` | Version-aware migration plan, without source mutation | Milestone 2 |
-| `verify` | Candidate AAR, metadata, API/ABI, R8, JNI, and packaging evidence | Milestone 2 |
-| `matrix` | Real Java/Kotlin consumer builds across declared toolchains | Milestone 3 |
-| `mcp serve` | Agent interface over the stable CLI/domain contract | Milestone 4 |
+| `doctor` | Read-only inventory and migration-risk findings | Implemented |
+| `host add/remove` | Reversible temporary application host with ownership proof | Implemented |
+| `plan --target-agp` | Version-aware migration plan, without source mutation | Implemented |
+| `verify` | Candidate build, AAR/JVM linkage, metadata, R8, and JNI packaging evidence | Implemented with documented limits |
+| `matrix` | Real Java/Kotlin consumer builds across declared toolchains | Implemented; four endpoint cells proven |
+| `mcp serve` | Agent interface over the shared domain contract | Implemented |
 
-Roadmap commands must return a clear `not implemented` error until their
-acceptance gate is met; placeholder success is forbidden.
+Every delivered command must distinguish a pass, failure, skipped evidence, and
+inability to run. Placeholder success is forbidden.
 
 ## Milestone 1: diagnostic and host MVP
 
@@ -59,7 +76,7 @@ acceptance gate is met; placeholder success is forbidden.
    common migration-risk signals in Groovy and Kotlin DSL projects.
 3. It explains unsupported dynamic build logic instead of guessing.
 4. Text and JSON reports contain the same ordered findings. JSON carries a
-   schema version so CI and a future MCP adapter can depend on it.
+   schema version so CI and the MCP adapter can depend on it.
 5. Exit code `0` means analysis completed without findings at or above the
    configured threshold, `1` means the threshold was met, and `2` means the
    command could not produce a trustworthy report.
@@ -95,20 +112,20 @@ is lexical or incomplete.
 - Rewriting arbitrary Gradle build logic.
 - Running Android Studio UI automation inside `doctor`.
 - Claiming binary or runtime compatibility from static analysis alone.
-- Silently downloading JDKs, SDKs, Gradle distributions, or containers.
+- Downloading JDKs, SDKs, containers, or Gradle without explicit opt-in.
 - Supporting every historical AGP syntax in the first host generator.
 
 ## Milestone 2: migration and artifact verification
 
-This milestone starts only after Milestone 1 has been exercised against at
-least three external Android library repositories and the findings have been
-triaged for false positives.
+This milestone started after Milestone 1 was exercised against Timber, Picasso,
+and Lottie Android and the useful/noisy/unresolved findings were recorded in
+the validation log.
 
 The `verify` result must distinguish:
 
 - command execution evidence (`help`, dry-run, AAR assembly);
 - artifact structure and metadata evidence;
-- public API/ABI evidence delegated to a declared engine;
+- public/protected JVM linkage evidence from a versioned declared engine;
 - consumer R8 and JNI packaging evidence;
 - checks that were skipped, including the reason.
 
@@ -132,8 +149,10 @@ running the CLI can run old Gradle versions.
 
 ## Milestone 4: integrations
 
-The MCP server and Gradle plugin are adapters only. They may not duplicate
-project detection, policy evaluation, mutation safety, or report rendering.
+The MCP server and a future Gradle plugin are adapters only. They may not
+duplicate project detection, policy evaluation, mutation safety, or report
+rendering. The MCP server now calls the same domain packages directly; the
+Gradle plugin remains a future integration.
 
 ## Validation gates
 
@@ -143,10 +162,12 @@ project detection, policy evaluation, mutation safety, or report rendering.
   classify every finding as useful, noisy, or missing.
 - **Gate C — host necessity:** keep `host` only if it changes a reproduced
   failure into a usable Upgrade Assistant flow.
-- **Gate D — matrix feasibility:** prove at least one old and one current AGP
-  Java/Kotlin consumer pair with explicit JDK provisioning.
-- **Gate E — integration demand:** add MCP only after a stable JSON schema and
-  at least one non-interactive CI user exist.
+- **Gate D — matrix feasibility (passed technically):** AGP 4.2.2/9.2.0 ×
+  Java/Kotlin passed with Gradle 6.7.1/9.4.1 and JDK 11/17. This is not external
+  adoption evidence.
+- **Gate E — integration demand (partially satisfied):** versioned JSON and CI
+  exist and MCP was explicitly requested for this repository. Broader external
+  demand remains unverified.
 
 ## Re-plan triggers
 

@@ -1,45 +1,335 @@
 # AARGrade
 
-> Upgrade your AAR without breaking consumers.
+한국어 | [English](README.en.md)
 
-AARGrade is an evidence-first CLI for Android library maintainers. It is being
-built to diagnose Android Gradle Plugin (AGP) migration risks, create a
-reversible temporary application host when one is genuinely needed, and later
-prove a candidate AAR against real Java and Kotlin consumer builds.
+[![CI](https://github.com/gay00ung/aargrade/actions/workflows/ci.yml/badge.svg)](https://github.com/gay00ung/aargrade/actions/workflows/ci.yml)
 
-The project is intentionally CLI-first. CI integrations, a Gradle plugin, and
-an MCP server will reuse the same core instead of becoming separate sources of
-truth.
+> 고객 프로젝트를 깨뜨리지 않고 AAR을 업그레이드하세요.
 
-## Current scope
+AARGrade는 **Android 라이브러리와 SDK 제작자를 위한 AGP 마이그레이션
+안전망**입니다. 새 Android Gradle Plugin(AGP)으로 만든 AAR이 기존 고객
+환경에서도 빌드되는지, 감으로 판단하지 않고 재현 가능한 증거로 확인합니다.
 
-AARGrade is in its first implementation milestone:
+- **AAR**: Android 라이브러리를 고객에게 배포하는 파일 형식
+- **AGP**: Android 프로젝트를 빌드하는 Gradle 플러그인
+- **기준 AAR**: 현재 고객에게 배포 중인 정상 버전
+- **후보 AAR**: AGP 업그레이드 후 새로 만든 버전
 
-- `aargrade doctor`: static, read-only Gradle project diagnosis.
-- `aargrade host add/remove`: owned, preview-first temporary host lifecycle.
-- Stable text and JSON output for humans, CI, and future MCP clients.
+## 아주 간단히 말하면
 
-`plan`, `verify`, `matrix`, and `mcp serve` are roadmap commands and are not
-claimed as implemented yet.
-
-## Build from source
-
-```bash
-go test ./...
-go build ./cmd/aargrade
-./aargrade doctor --project /path/to/android-library
-./aargrade host add --project /path/to/android-library
+```text
+현재 프로젝트 진단
+→ AGP 업그레이드 순서 확인
+→ 기준 AAR과 후보 AAR의 구조·JVM 연결 호환성 비교
+→ 구형/최신 Java·Kotlin 고객 앱에서 실제 빌드
+→ 결과를 사람, CI, MCP 에이전트가 같은 형식으로 사용
 ```
 
-See [the CLI contract](docs/cli.md), [product plan](docs/product/plan.md),
-[validation log](docs/product/validation.md), and
-[Upgrade Assistant experiment](docs/product/upgrade-assistant-experiment.md)
-before relying on roadmap features. The deliberately unsafe Consumer R8
-fixture is documented in [the R8 configuration analysis](R8_Configuration_Analysis.md).
-Architecture decisions start with [the CLI runtime ADR](docs/adr/0001-cli-runtime.md).
+AARGrade가 AGP나 소스 코드를 마음대로 바꾸지는 않습니다. `plan`은 변경
+순서를 알려주고, `verify`와 `matrix`는 마이그레이션 결과를 검증합니다.
+파일을 직접 바꾸는 기능은 임시 앱을 관리하는 `host`뿐이며, 이것도 기본은
+미리보기이고 `--apply`를 명시해야 적용됩니다.
 
-## Status
+## 지금 실제로 되는 기능
 
-The name **AARGrade** is provisional until trademark review is complete. The
-technical namespace checks performed on 2026-08-13 are recorded in the
-validation log.
+| 명령 | 하는 일 | 프로젝트 파일 변경 |
+| --- | --- | --- |
+| `doctor` | 프로젝트 구조와 AGP 마이그레이션 위험 진단 | 없음 |
+| `plan` | 목표 AGP에 맞는 Gradle·JDK와 작업 순서 작성 | 없음 |
+| `verify` | AAR 빌드/검사 및 기준 AAR과 정적 호환성 비교 | 소스는 안 바꾸지만 Gradle 빌드 결과 생성 가능 |
+| `matrix` | 격리된 Java·Kotlin 고객 앱을 만들어 실제 빌드 | `.aargrade/matrix` 아래에 증거 생성 |
+| `host add/remove` | Upgrade Assistant 실험용 임시 앱을 안전하게 생성/제거 | `--apply`를 쓴 경우만 |
+| `mcp serve` | 위 기능을 MCP 호환 에이전트에 제공 | 호출한 도구의 규칙을 따름 |
+
+`verify`의 내장 비교기는 JVM 클래스 파일의 public/protected 연결 표면을
+검사합니다. Kotlin/Java **소스 호환성 전체**나 JNI 런타임 동작까지
+증명하지는 않습니다. 그래서 마지막에 실제 고객 프로젝트를 빌드하는
+`matrix`가 필요합니다.
+
+## 1분 체험
+
+Git과 Go 1.25 이상만 있으면 됩니다. 이 읽기 전용 데모에는 Android Studio나
+Android SDK가 필요하지 않습니다.
+
+```bash
+git clone https://github.com/gay00ung/aargrade.git
+cd aargrade
+make demo
+```
+
+공개 예제 [`examples/library-only`](examples/library-only)를 대상으로 다음을
+보여줍니다.
+
+1. `doctor`가 앱 없는 Android 라이브러리 프로젝트를 진단합니다.
+2. `plan`이 AGP 9.3 마이그레이션 순서를 만듭니다.
+3. `host add`가 만들 임시 앱과 Gradle 변경을 미리 보여줍니다.
+4. 실제 파일은 하나도 변경하지 않습니다.
+
+## 설치
+
+현재 GitHub 버전을 설치합니다.
+
+```bash
+go install github.com/gay00ung/aargrade/cmd/aargrade@latest
+export PATH="$(go env GOPATH)/bin:$PATH"
+aargrade version
+```
+
+아직 정식 태그 릴리스가 없습니다. CI에 바로 도입한다면 릴리스 태그가
+생기기 전까지 특정 커밋을 고정하는 편이 안전합니다.
+
+저장소에서 직접 빌드할 수도 있습니다.
+
+```bash
+make build
+./bin/aargrade version
+```
+
+## 실제 사용 순서
+
+### 1. 현재 프로젝트 진단
+
+`settings.gradle` 또는 `settings.gradle.kts`가 있는 프로젝트 루트에서
+실행합니다.
+
+```bash
+aargrade doctor --project .
+```
+
+Gradle을 실행하거나 파일을 수정하지 않고 다음 항목을 정적으로 확인합니다.
+
+- 앱·라이브러리 모듈, AGP, Gradle Wrapper
+- AGP 9 Built-in Kotlin 전환 신호, KSP, kapt
+- 오래된 Variant API와 DSL, `BuildConfig` 설정
+- Consumer R8의 전역 옵션과 지나치게 넓은 keep 규칙
+- NDK, CMake, JNI 설정
+- Upgrade Assistant가 해석하기 어려운 동적 Gradle 구성
+
+### 2. 마이그레이션 순서 만들기
+
+```bash
+aargrade plan --project . --target-agp 9.3.0
+```
+
+현재 프로젝트 진단 결과와 AARGrade의 버전별 정책을 합쳐 다음을 알려줍니다.
+
+- 목표 AGP에 필요한 최소 Gradle과 JDK
+- 먼저 해결해야 할 차단 항목
+- 필수, 검토, 선택 단계의 실행 순서
+- 마지막 `verify`와 `matrix` 검증 단계
+
+알 수 없는 AGP 조합은 추측하지 않고 오류로 중단합니다. `plan`은 계획만
+만들며 Gradle 파일을 자동 수정하지 않습니다.
+
+### 3. 새 AAR 검증
+
+가장 신뢰도가 높은 사용법은 현재 배포 중인 기준 AAR과 새 후보 AAR을 함께
+주는 것입니다.
+
+```bash
+aargrade verify \
+  --baseline-aar releases/sdk-1.4.0.aar \
+  --candidate-aar sdk/build/outputs/aar/sdk-release.aar
+```
+
+후보 AAR 경로를 생략하면 AARGrade가 프로젝트의 Gradle Wrapper로 `help`,
+`build --dry-run`, release AAR 조립을 차례로 실행합니다.
+
+```bash
+aargrade verify \
+  --project . \
+  --library :sdk \
+  --baseline-aar releases/sdk-1.4.0.aar
+```
+
+검사하는 내용은 다음과 같습니다.
+
+- 안전한 AAR ZIP 구조, manifest, `classes.jar`
+- AAR metadata의 `minCompileSdk`와 최소 AGP 요구사항 증가
+- public/protected JVM 클래스·필드·메서드 제거와 연결 의미·sealed 계층 변경
+- Consumer R8 전역 옵션과 넓은 keep 규칙
+- JNI/Prefab ABI별 `.so` 제거와 바이너리 변경
+
+기준 AAR을 주지 않으면 비교 항목은 `SKIPPED`로 표시되고 결과는
+`EVIDENCE`입니다. 건너뛴 검사를 성공으로 표시하지 않습니다.
+
+### 4. 고객 호환성 매트릭스 실행
+
+저장소 루트의 [`aargrade.yml`](aargrade.yml)은 실제로 사용하는 설정
+예제입니다.
+
+```yaml
+schemaVersion: 1
+candidateAar: sdk/build/outputs/aar/sdk-release.aar
+baselineAar: releases/sdk-1.4.0.aar
+
+cells:
+  - name: legacy-java
+    agp: 4.2.2
+    gradle: 6.7.1
+    jdk: 11
+    compileSdk: 30
+    minSdk: 21
+    language: java
+
+  - name: current-kotlin
+    agp: 9.2.0
+    gradle: 9.4.1
+    jdk: 17
+    compileSdk: 35
+    minSdk: 21
+    language: kotlin
+```
+
+JDK는 셀별로 명시해야 합니다. Gradle은 직접 지정하거나, 네트워크 사용을
+명시적으로 허용해 체크섬 검증 후 내려받을 수 있습니다.
+
+```bash
+export AARGRADE_JAVA_HOME_11=/path/to/jdk-11
+export AARGRADE_JAVA_HOME_17=/path/to/jdk-17
+
+aargrade matrix --config aargrade.yml --allow-downloads
+```
+
+다운로드를 원하지 않으면 실행 파일을 직접 지정합니다.
+
+```bash
+aargrade matrix \
+  --config aargrade.yml \
+  --gradle-bin 6.7.1=/path/to/gradle-6.7.1/bin/gradle \
+  --gradle-bin 9.4.1=/path/to/gradle-9.4.1/bin/gradle
+```
+
+각 셀마다 독립된 Android 앱을 생성하고 AAR을 직접 의존성으로 넣은 뒤
+release 빌드와 R8 최소화를 수행합니다. 기준 AAR은 성공하지만 후보 AAR만
+실패하면 `REGRESSION`, 둘 다 실패하면 기존 미지원 환경인 `UNSUPPORTED`로
+구분합니다. 생성 프로젝트와 로그는 `.aargrade/matrix/run-*`에 남습니다.
+
+직접 파일 의존성은 Maven POM의 전이 의존성을 자동으로 가져오지 않습니다.
+SDK가 다른 라이브러리를 필요로 한다면 셀의 `dependencies`에 실제 배포
+의존성을 적어야 고객 환경과 같은 조건이 됩니다. 보고서는 흔한 비밀 값과
+로컬 경로를 마스킹하지만, 보존된 빌드 로그는 민감한 자료처럼 취급하세요.
+
+AARGrade는 Gradle만 선택적으로 내려받습니다. JDK와 Android SDK platform은
+사용자가 로컬 또는 CI에 준비해야 합니다.
+
+### 5. 임시 앱 모듈이 정말 필요할 때
+
+앱 모듈이 없어서 Upgrade Assistant 문제가 발생한다는 현상을 먼저 재현한
+경우에만 사용합니다.
+
+```bash
+# 변경 내용만 확인
+aargrade host add --project .
+
+# 검토 후 적용
+aargrade host add --project . --apply
+./gradlew :aargrade-upgrade-host:tasks --all
+
+# 실험이 끝나면 제거도 먼저 미리보기
+aargrade host remove --project .
+aargrade host remove --project . --apply
+```
+
+AARGrade가 생성 당시 기록한 SHA-256과 소유 설정 블록이 그대로일 때만
+제거합니다. 사용자가 수정한 파일이나 기존 앱은 삭제하지 않습니다.
+
+### 6. MCP 에이전트에서 사용
+
+MCP 클라이언트에는 다음 stdio 명령을 등록합니다.
+
+```text
+aargrade mcp serve
+```
+
+일반적인 MCP 설정 형태는 다음과 같습니다. 실제 키 이름은 사용하는
+클라이언트 설명서를 따르세요.
+
+```json
+{
+  "mcpServers": {
+    "aargrade": {
+      "command": "aargrade",
+      "args": ["mcp", "serve"]
+    }
+  }
+}
+```
+
+서버가 제공하는 도구는 `aargrade_doctor`, `aargrade_plan`,
+`aargrade_verify`, `aargrade_matrix`, `aargrade_host_add`,
+`aargrade_host_remove`입니다. 결과는 CLI와 같은 도메인 모델의 구조화된
+JSON입니다. `host`의 `apply`와 `matrix`의 `allowDownloads`는 MCP에서도
+기본값이 `false`입니다.
+
+## CI에서 사용
+
+진단 보고서 예시입니다.
+
+```bash
+aargrade doctor \
+  --project . \
+  --format json \
+  --fail-on warn > aargrade-doctor.json
+```
+
+호환성 비교와 매트릭스 보고서도 JSON으로 저장할 수 있습니다.
+
+```bash
+aargrade verify \
+  --baseline-aar baseline.aar \
+  --candidate-aar candidate.aar \
+  --format json > aargrade-verify.json
+
+aargrade matrix \
+  --config aargrade.yml \
+  --format json > aargrade-matrix.json
+```
+
+주요 종료 코드는 다음과 같습니다.
+
+| 명령 | `0` | `1` | `2` |
+| --- | --- | --- | --- |
+| `doctor` | 기준 이상의 진단 없음 | `--fail-on` 기준 도달 | 분석/인자 오류 |
+| `plan` | 실행 가능한 계획 | 차단 항목 있음 | 정책/분석/인자 오류 |
+| `verify` | 증거 생성 또는 호환 | 검증 실패 | 실행/입력 오류 |
+| `matrix` | 선택한 셀 통과 | 후보 실패 또는 회귀 | 미완료/환경/입력 오류 |
+
+## 테스트와 검증 범위
+
+```bash
+make test       # 단위·fixture·공개 예제·MCP stdio 테스트
+make vet        # Go 정적 분석
+make test-race  # 동시성 오류 검사
+make vuln       # 호출 가능한 Go 취약점 검사
+make check      # test + vet + 읽기 전용 데모
+make example-build
+make example-verify # 예제 AAR 빌드 후 기준/후보 비교
+```
+
+사용자 관점의 흐름은 [`tests/integration`](tests/integration)에 따로 두었고,
+세부 단위 테스트는 Go 관례대로 각 `internal/*` 패키지의 `_test.go`에 함께
+있습니다. Android SDK가 필요한 실제 소비자 빌드는 CI의 `consumer-matrix`
+작업이 담당합니다.
+
+CI는 Linux, macOS, Windows에서 Go 테스트를 수행합니다. 또한 공개 AAR을
+실제로 만든 뒤 다음 네 고객 셀을 각각 release 빌드합니다.
+
+- AGP 4.2.2 + Gradle 6.7.1 + JDK 11 + Java
+- AGP 4.2.2 + Gradle 6.7.1 + JDK 11 + Kotlin
+- AGP 9.2.0 + Gradle 9.4.1 + JDK 17 + Java
+- AGP 9.2.0 + Gradle 9.4.1 + JDK 17 + Built-in Kotlin
+
+이 결과는 **설정한 네 환경의 빌드 증거**이지 모든 고객, 모든 API 호출,
+실기기 런타임을 보장한다는 뜻은 아닙니다.
+
+## 상세 문서
+
+- [CLI 전체 명세](docs/cli.md)
+- [제품 및 개발 계획](docs/product/plan.md)
+- [검증 기록](docs/product/validation.md)
+- [Upgrade Assistant A/B 실험 절차](docs/product/upgrade-assistant-experiment.md)
+- [Consumer R8 테스트 설정 분석](R8_Configuration_Analysis.md)
+- [CLI 런타임 결정 기록](docs/adr/0001-cli-runtime.md)
+
+**AARGrade**라는 이름은 상표 검토가 완료될 때까지 임시 이름입니다.
