@@ -5,6 +5,17 @@ absolute evidence paths. Human-readable text is the default; `--format json`
 emits a schema-versioned structured result. Exit code `2` always means the
 requested verdict could not be produced reliably.
 
+## `version`
+
+```bash
+aargrade version
+# aargrade v0.1.0-beta.1
+```
+
+Tagged release binaries receive the exact tag at link time. A binary installed
+with `go install ...@VERSION` uses the Go module version, while an untagged
+local build reports `dev` unless `make build VERSION=...` is used.
+
 ## `doctor`
 
 ```bash

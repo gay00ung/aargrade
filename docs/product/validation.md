@@ -245,6 +245,26 @@ This proves protocol behavior, not broad external demand for the integration.
   Go 1.25.12 as affected on 2026-08-14, CI was pinned to the fixed Go 1.25.13
   release and repeats the reachable-vulnerability scan there.
 
+## Release automation evidence
+
+- `make release-check` cross-compiled macOS, Linux, and Windows binaries for
+  amd64 and arm64 with CGO disabled.
+- All six archives contained the executable, both READMEs, the exact
+  Apache-2.0 license text, and licenses/notices collected for linked modules
+  and the Go toolchain. Generated SHA-256 entries verified successfully.
+- The archive matching the local host executed and reported the SemVer value
+  injected at link time rather than `dev`.
+- CI repeats this dry-run packaging check on Linux. Tag-triggered publishing
+  runs the same packaging scripts only after tests, vet, vulnerability
+  scanning, workflow linting, and the public demo pass.
+- The release job has `contents: write`; all earlier jobs retain read-only
+  repository access. Prerelease tags such as `v0.1.0-beta.1` are marked as
+  GitHub prereleases, while tags such as `v0.1.0` create stable releases.
+- Publishing rejects a tag whose commit is not an ancestor of `origin/main`.
+
+This validates the packaging and publication path without creating a public
+tag. The first tag remains a deliberate maintainer action.
+
 ## Unverified hypotheses
 
 1. The validated host workaround remains reliable across other supported

@@ -13,6 +13,10 @@
 - The MCP portion of Milestone 4 is implemented over the shared domain
   operations and tested through real stdio negotiation. A Gradle plugin is not
   implemented.
+- Distribution automation is implemented: SemVer tags build six macOS, Linux,
+  and Windows archives, verify their contents and embedded version, publish
+  SHA-256 checksums, and create a GitHub prerelease or stable release. The first
+  public tag remains an explicit maintainer action.
 - Upgrade Assistant Gates A and C passed in a controlled A→B→A experiment:
   Android Studio could not obtain an application project in the library-only
   baseline, loaded an AGP 7.4.2 migration plan after `host add`, and returned

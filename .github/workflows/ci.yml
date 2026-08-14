@@ -22,9 +22,15 @@ jobs:
           cache: true
       - run: go test ./...
       - run: go vet ./...
+      - name: Lint GitHub Actions workflows
+        if: runner.os == 'Linux'
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color
       - name: Scan reachable vulnerabilities
         if: runner.os == 'Linux'
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
+      - name: Validate cross-platform release archives
+        if: runner.os == 'Linux'
+        run: make release-check
 
   gradle-smoke:
     runs-on: ubuntu-latest

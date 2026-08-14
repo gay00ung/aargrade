@@ -3,6 +3,7 @@
 [한국어](README.md) | English
 
 [![CI](https://github.com/gay00ung/aargrade/actions/workflows/ci.yml/badge.svg)](https://github.com/gay00ung/aargrade/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 
 > Upgrade your AAR without breaking consumers.
 
@@ -52,15 +53,44 @@ It does not change the example.
 
 ## Install
 
+Download the archive for your OS and CPU from
+[GitHub Releases](https://github.com/gay00ung/aargrade/releases):
+
+| Platform | Asset |
+| --- | --- |
+| Apple Silicon Mac | `aargrade_<VERSION>_darwin_arm64.tar.gz` |
+| Intel Mac | `aargrade_<VERSION>_darwin_amd64.tar.gz` |
+| Linux x86-64 | `aargrade_<VERSION>_linux_amd64.tar.gz` |
+| Linux ARM64 | `aargrade_<VERSION>_linux_arm64.tar.gz` |
+| Windows x86-64 | `aargrade_<VERSION>_windows_amd64.zip` |
+| Windows ARM64 | `aargrade_<VERSION>_windows_arm64.zip` |
+
+After the first beta is published, an Apple Silicon installation looks like:
+
 ```bash
-go install github.com/gay00ung/aargrade/cmd/aargrade@latest
+AARGRADE_VERSION=v0.1.0-beta.1
+AARGRADE_ASSET="aargrade_${AARGRADE_VERSION#v}_darwin_arm64"
+curl -fLO "https://github.com/gay00ung/aargrade/releases/download/${AARGRADE_VERSION}/${AARGRADE_ASSET}.tar.gz"
+curl -fLO "https://github.com/gay00ung/aargrade/releases/download/${AARGRADE_VERSION}/checksums.txt"
+grep " ${AARGRADE_ASSET}.tar.gz$" checksums.txt | shasum -a 256 -c -
+tar -xzf "${AARGRADE_ASSET}.tar.gz"
+sudo install -m 0755 "${AARGRADE_ASSET}/aargrade" /usr/local/bin/aargrade
+aargrade version
+```
+
+Each archive also carries the Go toolchain and linked module license notices
+under `third_party_licenses`.
+
+With Go 1.25 or newer, install the exact tag instead:
+
+```bash
+go install github.com/gay00ung/aargrade/cmd/aargrade@v0.1.0-beta.1
 export PATH="$(go env GOPATH)/bin:$PATH"
 aargrade version
 ```
 
-There is no tagged release yet. Pin a commit if adopting the development
-version in CI. To build a checkout instead, run `make build` and use
-`./bin/aargrade`.
+Before that tag exists, or when testing the development checkout, run
+`make build VERSION=dev` and use `./bin/aargrade`.
 
 ## End-to-end workflow
 
@@ -209,6 +239,7 @@ make vet
 make test-race
 make vuln
 make check
+make release-check
 make example-build
 make example-verify
 ```
@@ -235,11 +266,15 @@ remains explicitly manual evidence rather than a headless-build substitute.
 ## Design and validation
 
 - [CLI contract](docs/cli.md)
+- [Release guide](docs/releasing.md)
+- [릴리스 방법](docs/releasing.ko.md)
 - [Product and delivery plan](docs/product/plan.md)
 - [Validation evidence](docs/product/validation.md)
 - [Upgrade Assistant A/B evidence](docs/product/upgrade-assistant-experiment.md)
 - [Upgrade Assistant A/B evidence (Korean)](docs/product/upgrade-assistant-experiment.ko.md)
 - [Consumer R8 fixture analysis](R8_Configuration_Analysis.md)
 - [CLI runtime decision](docs/adr/0001-cli-runtime.md)
+
+Source and release binaries are provided under the [Apache License 2.0](LICENSE).
 
 The name **AARGrade** remains provisional until trademark review.

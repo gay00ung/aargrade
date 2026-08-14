@@ -1,11 +1,14 @@
 GO ?= go
 GRADLE ?= ./examples/library-only/gradlew
+VERSION ?= dev
+RELEASE_VERSION ?= v0.1.0-beta.1
+RELEASE_DIR ?= dist/$(RELEASE_VERSION)
 
-.PHONY: build test test-race test-upgrade-assistant-fixture vet vuln demo check example-build example-verify
+.PHONY: build test test-race test-upgrade-assistant-fixture vet vuln demo check release release-check example-build example-verify
 
 build:
 	mkdir -p bin
-	$(GO) build -trimpath -o bin/aargrade ./cmd/aargrade
+	$(GO) build -trimpath -ldflags "-X=main.version=$(VERSION)" -o bin/aargrade ./cmd/aargrade
 
 test:
 	$(GO) test ./...
@@ -26,6 +29,14 @@ demo:
 	./scripts/demo.sh
 
 check: test vet demo
+
+release:
+	./scripts/build-release.sh "$(RELEASE_VERSION)" "$(RELEASE_DIR)"
+
+release-check:
+	@release_tmp="$$(mktemp -d)"; \
+	trap 'rm -rf "$${release_tmp}"' EXIT; \
+	./scripts/build-release.sh v0.0.0-test.1 "$${release_tmp}"
 
 example-build:
 	$(GRADLE) -p examples/library-only :sdk:assembleRelease --no-daemon

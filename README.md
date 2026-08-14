@@ -3,6 +3,7 @@
 한국어 | [English](README.en.md)
 
 [![CI](https://github.com/gay00ung/aargrade/actions/workflows/ci.yml/badge.svg)](https://github.com/gay00ung/aargrade/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 
 > 고객 프로젝트를 깨뜨리지 않고 AAR을 업그레이드하세요.
 
@@ -67,21 +68,53 @@ make demo
 
 ## 설치
 
-현재 GitHub 버전을 설치합니다.
+### 릴리스 바이너리 (권장)
+
+[GitHub Releases](https://github.com/gay00ung/aargrade/releases)에서 운영체제와
+CPU에 맞는 파일을 받습니다.
+
+| 내 환경 | 받을 파일 |
+| --- | --- |
+| Apple Silicon Mac | `aargrade_<VERSION>_darwin_arm64.tar.gz` |
+| Intel Mac | `aargrade_<VERSION>_darwin_amd64.tar.gz` |
+| 일반 64비트 Linux | `aargrade_<VERSION>_linux_amd64.tar.gz` |
+| ARM64 Linux | `aargrade_<VERSION>_linux_arm64.tar.gz` |
+| 일반 64비트 Windows | `aargrade_<VERSION>_windows_amd64.zip` |
+| ARM64 Windows | `aargrade_<VERSION>_windows_arm64.zip` |
+
+첫 베타가 공개된 뒤 Apple Silicon Mac에서는 다음처럼 설치할 수 있습니다.
 
 ```bash
-go install github.com/gay00ung/aargrade/cmd/aargrade@latest
+AARGRADE_VERSION=v0.1.0-beta.1
+AARGRADE_ASSET="aargrade_${AARGRADE_VERSION#v}_darwin_arm64"
+curl -fLO "https://github.com/gay00ung/aargrade/releases/download/${AARGRADE_VERSION}/${AARGRADE_ASSET}.tar.gz"
+curl -fLO "https://github.com/gay00ung/aargrade/releases/download/${AARGRADE_VERSION}/checksums.txt"
+grep " ${AARGRADE_ASSET}.tar.gz$" checksums.txt | shasum -a 256 -c -
+tar -xzf "${AARGRADE_ASSET}.tar.gz"
+sudo install -m 0755 "${AARGRADE_ASSET}/aargrade" /usr/local/bin/aargrade
+aargrade version
+```
+
+`checksums.txt`는 다운로드가 손상되지 않았는지 확인합니다. Windows에서는
+릴리스 페이지에서 ZIP을 내려받아 `aargrade.exe`를 PATH에 등록하면 됩니다.
+각 압축에는 Apache-2.0 `LICENSE`와 함께 실행 파일에 포함된 Go 및 외부
+모듈의 라이선스·고지 파일도 들어 있습니다.
+
+### Go로 설치
+
+Go 1.25 이상이 있다면 버전을 명시해 설치할 수도 있습니다.
+
+```bash
+go install github.com/gay00ung/aargrade/cmd/aargrade@v0.1.0-beta.1
 export PATH="$(go env GOPATH)/bin:$PATH"
 aargrade version
 ```
 
-아직 정식 태그 릴리스가 없습니다. CI에 바로 도입한다면 릴리스 태그가
-생기기 전까지 특정 커밋을 고정하는 편이 안전합니다.
-
-저장소에서 직접 빌드할 수도 있습니다.
+태그가 아직 공개되지 않았거나 개발 버전을 확인하려면 저장소에서 직접
+빌드합니다.
 
 ```bash
-make build
+make build VERSION=dev
 ./bin/aargrade version
 ```
 
@@ -310,6 +343,7 @@ make vet        # Go 정적 분석
 make test-race  # 동시성 오류 검사
 make vuln       # 호출 가능한 Go 취약점 검사
 make check      # test + vet + 읽기 전용 데모
+make release-check # 6개 플랫폼 압축·체크섬·내장 버전 검사
 make example-build
 make example-verify # 예제 AAR 빌드 후 기준/후보 비교
 
@@ -340,11 +374,15 @@ UI A/B는 headless 빌드로 대체하지 않고 위 실험 기록으로 관리�
 ## 상세 문서
 
 - [CLI 전체 명세](docs/cli.md)
+- [릴리스 방법](docs/releasing.ko.md)
+- [Release guide (English)](docs/releasing.md)
 - [제품 및 개발 계획](docs/product/plan.md)
 - [검증 기록](docs/product/validation.md)
 - [Upgrade Assistant A/B 실제 결과 (한국어)](docs/product/upgrade-assistant-experiment.ko.md)
 - [Upgrade Assistant A/B evidence (English)](docs/product/upgrade-assistant-experiment.md)
 - [Consumer R8 테스트 설정 분석](R8_Configuration_Analysis.md)
 - [CLI 런타임 결정 기록](docs/adr/0001-cli-runtime.md)
+
+소스와 릴리스 바이너리는 [Apache License 2.0](LICENSE)으로 배포합니다.
 
 **AARGrade**라는 이름은 상표 검토가 완료될 때까지 임시 이름입니다.
