@@ -12,6 +12,7 @@ import (
 
 	"github.com/gay00ung/aargrade/internal/migration"
 	"github.com/gay00ung/aargrade/internal/model"
+	"github.com/gay00ung/aargrade/internal/upgrade"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -49,8 +50,10 @@ func TestServerListsToolsAndRunsDoctor(t *testing.T) {
 		"aargrade_host_remove",
 		"aargrade_matrix",
 		"aargrade_migrate",
+		"aargrade_migrate_accept",
 		"aargrade_migrate_rollback",
 		"aargrade_plan",
+		"aargrade_upgrade",
 		"aargrade_verify",
 	}
 	if !equalStrings(names, want) {
@@ -108,6 +111,28 @@ func TestServerListsToolsAndRunsDoctor(t *testing.T) {
 	if !migrationResult.Ready || migrationResult.Applied || len(migrationResult.Changes) == 0 {
 		t.Fatalf("unexpected migrate preview: %#v", migrationResult)
 	}
+
+	called, err = clientSession.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "aargrade_upgrade",
+		Arguments: UpgradeInput{ProjectPath: migrationProject, TargetAGP: "9.2.0"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if called.IsError {
+		t.Fatalf("upgrade preview returned a tool error: %v", called.GetError())
+	}
+	encoded, err = json.Marshal(called.StructuredContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var upgradeReport upgrade.Report
+	if err := json.Unmarshal(encoded, &upgradeReport); err != nil {
+		t.Fatal(err)
+	}
+	if upgradeReport.Verdict != "preview" || !upgradeReport.Migration.Ready || upgradeReport.Applied {
+		t.Fatalf("unexpected upgrade preview: %#v", upgradeReport)
+	}
 }
 
 func TestInvalidMCPInputsBecomeToolErrors(t *testing.T) {
@@ -153,9 +178,9 @@ func TestStdioServerNegotiatesAndListsTools(t *testing.T) {
 		_ = session.Close()
 		t.Fatal(err)
 	}
-	if len(listed.Tools) != 8 {
+	if len(listed.Tools) != 10 {
 		_ = session.Close()
-		t.Fatalf("stdio tool count = %d, want 8", len(listed.Tools))
+		t.Fatalf("stdio tool count = %d, want 10", len(listed.Tools))
 	}
 	if err := session.Close(); err != nil {
 		t.Fatal(err)

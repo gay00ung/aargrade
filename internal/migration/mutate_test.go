@@ -121,6 +121,56 @@ func TestRollbackRefusesUserModifiedFile(t *testing.T) {
 	assertFileContains(t, buildFile, "user edit after migration")
 }
 
+func TestAcceptKeepsMigrationAndRemovesRollbackState(t *testing.T) {
+	root := copyMigrationFixture(t, "migrate-kotlin-catalog")
+	applied, err := Migrate(MutationOptions{ProjectPath: root, TargetAGP: "9.2.0", Apply: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !applied.Applied {
+		t.Fatalf("migration apply = %#v", applied)
+	}
+	preview, err := Accept(AcceptOptions{ProjectPath: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !preview.Ready || preview.Applied || len(preview.Changes) != len(applied.Changes) {
+		t.Fatalf("accept preview = %#v", preview)
+	}
+	accepted, err := Accept(AcceptOptions{ProjectPath: root, Apply: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !accepted.Applied {
+		t.Fatalf("accept apply = %#v", accepted)
+	}
+	assertFileContains(t, filepath.Join(root, "gradle", "libs.versions.toml"), `agp = "9.2.0"`)
+	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(stateRelativePath))); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("accepted migration state remains: %v", err)
+	}
+}
+
+func TestAcceptRefusesChangedMigratedFile(t *testing.T) {
+	root := copyMigrationFixture(t, "migrate-kotlin-catalog")
+	if _, err := Migrate(MutationOptions{ProjectPath: root, TargetAGP: "9.2.0", Apply: true}); err != nil {
+		t.Fatal(err)
+	}
+	buildPath := filepath.Join(root, "sdk", "build.gradle.kts")
+	if err := os.WriteFile(buildPath, []byte(readMigrationTestFile(t, buildPath)+"\n// reviewed edit\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	result, err := Accept(AcceptOptions{ProjectPath: root, Apply: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Ready || result.Applied || !containsMutationText(result.Blockers, "refusing to discard rollback state") {
+		t.Fatalf("changed migration should block accept: %#v", result)
+	}
+	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(stateRelativePath))); err != nil {
+		t.Fatalf("blocked accept removed state: %v", err)
+	}
+}
+
 func TestRollbackRecoversPartiallyAppliedTransaction(t *testing.T) {
 	root := copyMigrationFixture(t, "migrate-kotlin-catalog")
 	original := migrationTreeSnapshot(t, root)
@@ -211,6 +261,168 @@ func TestMigrateBlocksBuildSrcForPreAGP9Target(t *testing.T) {
 	}
 	if result.Ready || !containsMutationText(result.Blockers, "buildSrc") {
 		t.Fatalf("buildSrc should block every automatic migration target: %#v", result)
+	}
+}
+
+func TestMigrateAutoRepairHandlesCommonAGP9Recipes(t *testing.T) {
+	root := copyMigrationFixture(t, "migrate-kotlin-catalog")
+	buildPath := filepath.Join(root, "sdk", "build.gradle.kts")
+	build := `plugins {
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.android)
+}
+
+android {
+    compileSdkVersion(35)
+
+    defaultConfig {
+        minSdkVersion 21
+        buildConfigField("String", "SDK_NAME", "\"agent\"")
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
+`
+	if err := os.WriteFile(buildPath, []byte(build), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	manifestPath := filepath.Join(root, "sdk", "src", "main", "AndroidManifest.xml")
+	if err := os.WriteFile(manifestPath, []byte(`<manifest package="dev.aargrade.agentfixture" />`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	preview, err := Migrate(MutationOptions{ProjectPath: root, TargetAGP: "9.2.0", AutoRepair: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !preview.Ready {
+		t.Fatalf("auto-repair preview blocked: %#v", preview.Blockers)
+	}
+	wantRepairs := []string{"agp9.built-in-kotlin.catalog", "agp9.java-kotlin-target", "agp9.kotlin-options", "agp9.sdk-dsl", "android.buildconfig.enable", "android.manifest-package", "android.namespace"}
+	var gotRepairs []string
+	for _, repair := range preview.Repairs {
+		gotRepairs = append(gotRepairs, repair.ID)
+	}
+	sort.Strings(gotRepairs)
+	if !reflect.DeepEqual(gotRepairs, wantRepairs) {
+		t.Fatalf("repairs = %v, want %v", gotRepairs, wantRepairs)
+	}
+
+	applied, err := Migrate(MutationOptions{ProjectPath: root, TargetAGP: "9.2.0", AutoRepair: true, Apply: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !applied.Applied {
+		t.Fatalf("apply = %#v", applied)
+	}
+	updated := readMigrationTestFile(t, buildPath)
+	for _, want := range []string{
+		`namespace = "dev.aargrade.agentfixture"`,
+		"compileSdk = 35",
+		"minSdk = 21",
+		"buildConfig = true",
+		`sourceCompatibility = JavaVersion.toVersion("17")`,
+		`targetCompatibility = JavaVersion.toVersion("17")`,
+		"kotlin {",
+		`JvmTarget.fromTarget("17")`,
+	} {
+		if !strings.Contains(updated, want) {
+			t.Fatalf("updated build file does not contain %q:\n%s", want, updated)
+		}
+	}
+	for _, unwanted := range []string{"compileSdkVersion", "minSdkVersion", "kotlinOptions", "libs.plugins.kotlin.android"} {
+		if strings.Contains(updated, unwanted) {
+			t.Fatalf("updated build file still contains %q:\n%s", unwanted, updated)
+		}
+	}
+	catalog := readMigrationTestFile(t, filepath.Join(root, "gradle", "libs.versions.toml"))
+	if strings.Contains(catalog, "org.jetbrains.kotlin.android") {
+		t.Fatalf("Kotlin Android catalog entry remains:\n%s", catalog)
+	}
+	manifest := readMigrationTestFile(t, manifestPath)
+	if strings.Contains(manifest, "package=") || strings.TrimSpace(manifest) != "<manifest />" {
+		t.Fatalf("legacy manifest package was not removed safely: %q", manifest)
+	}
+}
+
+func TestManifestPackageAttributeRangePreservesOtherXML(t *testing.T) {
+	before := []byte("<manifest\n    xmlns:android=\"http://schemas.android.com/apk/res/android\"\n    package='dev.example.sdk'>")
+	start, end, err := manifestPackageAttributeRange(before)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after := string(before[:start]) + string(before[end:])
+	want := "<manifest\n    xmlns:android=\"http://schemas.android.com/apk/res/android\">"
+	if after != want {
+		t.Fatalf("manifest transform = %q, want %q", after, want)
+	}
+}
+
+func TestTransformLegacySDKSettersPreservesCRLF(t *testing.T) {
+	before := "android {\r\n    compileSdkVersion(35)\r\n}\r\n"
+	after, count := transformLegacySDKSetters(before)
+	if count != 1 || after != "android {\r\n    compileSdk = 35\r\n}\r\n" {
+		t.Fatalf("count=%d after=%q", count, after)
+	}
+}
+
+func TestEnsureJavaCompileTargetRefusesExistingTarget(t *testing.T) {
+	content := `android {
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+}
+`
+	if _, _, err := ensureJavaCompileTarget(content, "17"); err == nil || !strings.Contains(err.Error(), "conflicts") {
+		t.Fatalf("existing Java targets should require review: %v", err)
+	}
+}
+
+func TestEnsureJavaCompileTargetAcceptsMatchingExistingTargets(t *testing.T) {
+	content := `android {
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.toVersion("17")
+    }
+}
+`
+	updated, changed, err := ensureJavaCompileTarget(content, "17")
+	if err != nil || changed || updated != content {
+		t.Fatalf("matching targets should remain unchanged: changed=%v err=%v\n%s", changed, err, updated)
+	}
+}
+
+func TestLegacySDKSetterOutsideAndroidIsNotTransformed(t *testing.T) {
+	content := `fun configureSomething() {
+    minSdkVersion 19
+}
+
+android {
+    compileSdkVersion(35)
+}
+`
+	updated, count := transformLegacySDKSetters(content)
+	if count != 1 || !strings.Contains(updated, "minSdkVersion 19") || !strings.Contains(updated, "compileSdk = 35") {
+		t.Fatalf("count=%d updated=\n%s", count, updated)
+	}
+}
+
+func TestMigrateAutoRepairRefusesNamespaceWithoutLiteralManifestPackage(t *testing.T) {
+	root := copyMigrationFixture(t, "migrate-kotlin-catalog")
+	buildPath := filepath.Join(root, "sdk", "build.gradle.kts")
+	build := strings.Replace(readMigrationTestFile(t, buildPath), `    namespace = "dev.aargrade.migratefixture"`+"\n", "", 1)
+	if err := os.WriteFile(buildPath, []byte(build), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	result, err := Migrate(MutationOptions{ProjectPath: root, TargetAGP: "9.2.0", AutoRepair: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Ready || !containsMutationText(result.Blockers, "no literal package") {
+		t.Fatalf("missing manifest package should block: %#v", result)
 	}
 }
 

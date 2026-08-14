@@ -18,6 +18,8 @@ func RenderMutationText(writer io.Writer, result MutationResult) error {
 	status := "PREVIEW — no files changed"
 	if !result.Ready {
 		status = "BLOCKED — no files changed"
+	} else if result.TransactionStarted && !result.Applied {
+		status = "INCOMPLETE — rollback state recorded"
 	} else if result.Applied {
 		status = "APPLIED"
 	}

@@ -33,6 +33,8 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
 		return runMigrationPlan(args[1:], stdout, stderr, version)
 	case "migrate":
 		return runMigrate(args[1:], stdout, stderr, version)
+	case "upgrade":
+		return runUpgrade(args[1:], stdout, stderr, version)
 	case "verify":
 		return runVerify(args[1:], stdout, stderr, version)
 	case "matrix":
@@ -237,7 +239,8 @@ Commands:
   doctor   Diagnose an Android Gradle project without writing to it
   host     Preview or manage an owned temporary application host
   plan     Create a read-only, version-aware AGP migration plan
-  migrate  Preview, apply, or roll back bounded AGP migration edits
+  migrate  Preview, apply, accept, or roll back bounded AGP migration edits
+  upgrade  Repair, migrate, build, inspect, and optionally test consumers
   verify   Build or inspect an AAR and compare it with a baseline
   matrix   Build an AAR in isolated Java and Kotlin consumer cells
   mcp      Serve the CLI capabilities to MCP-compatible agents

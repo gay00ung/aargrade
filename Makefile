@@ -4,7 +4,7 @@ VERSION ?= dev
 RELEASE_VERSION ?= v0.1.0-beta.1
 RELEASE_DIR ?= dist/$(RELEASE_VERSION)
 
-.PHONY: build test test-race test-upgrade-assistant-fixture test-migration-smoke vet vuln demo check release release-check example-build example-verify
+.PHONY: build test test-race test-upgrade-assistant-fixture test-migration-smoke test-upgrade-agent-smoke vet vuln demo check release release-check example-build example-verify
 
 build:
 	mkdir -p bin
@@ -21,6 +21,9 @@ test-upgrade-assistant-fixture:
 
 test-migration-smoke:
 	./scripts/migration-smoke.sh
+
+test-upgrade-agent-smoke:
+	./scripts/upgrade-agent-smoke.sh
 
 vet:
 	$(GO) vet ./...

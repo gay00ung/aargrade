@@ -14,9 +14,15 @@ type MutationOptions struct {
 	CurrentAGPOverride string
 	ToolVersion        string
 	Apply              bool
+	AutoRepair         bool
 }
 
 type RollbackOptions struct {
+	ProjectPath string
+	Apply       bool
+}
+
+type AcceptOptions struct {
 	ProjectPath string
 	Apply       bool
 }
@@ -33,21 +39,29 @@ type FileChange struct {
 	mode   uint32
 }
 
+type Repair struct {
+	ID      string `json:"id"`
+	Path    string `json:"path"`
+	Summary string `json:"summary"`
+}
+
 type MutationResult struct {
-	SchemaVersion int                      `json:"schemaVersion"`
-	Operation     string                   `json:"operation"`
-	ToolVersion   string                   `json:"toolVersion,omitempty"`
-	ProjectRoot   string                   `json:"projectRoot"`
-	CurrentAGP    string                   `json:"currentAgp,omitempty"`
-	TargetAGP     string                   `json:"targetAgp,omitempty"`
-	Toolchain     *toolchain.Compatibility `json:"toolchain,omitempty"`
-	Ready         bool                     `json:"ready"`
-	Applied       bool                     `json:"applied"`
-	StatePath     string                   `json:"statePath,omitempty"`
-	Blockers      []string                 `json:"blockers,omitempty"`
-	Warnings      []string                 `json:"warnings,omitempty"`
-	Changes       []FileChange             `json:"changes,omitempty"`
-	NextSteps     []string                 `json:"nextSteps,omitempty"`
+	SchemaVersion      int                      `json:"schemaVersion"`
+	Operation          string                   `json:"operation"`
+	ToolVersion        string                   `json:"toolVersion,omitempty"`
+	ProjectRoot        string                   `json:"projectRoot"`
+	CurrentAGP         string                   `json:"currentAgp,omitempty"`
+	TargetAGP          string                   `json:"targetAgp,omitempty"`
+	Toolchain          *toolchain.Compatibility `json:"toolchain,omitempty"`
+	Ready              bool                     `json:"ready"`
+	Applied            bool                     `json:"applied"`
+	TransactionStarted bool                     `json:"transactionStarted,omitempty"`
+	StatePath          string                   `json:"statePath,omitempty"`
+	Blockers           []string                 `json:"blockers,omitempty"`
+	Warnings           []string                 `json:"warnings,omitempty"`
+	Repairs            []Repair                 `json:"repairs,omitempty"`
+	Changes            []FileChange             `json:"changes,omitempty"`
+	NextSteps          []string                 `json:"nextSteps,omitempty"`
 
 	statePath string
 	stateHash string

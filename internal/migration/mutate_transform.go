@@ -380,6 +380,31 @@ func removeKotlinAndroidPluginLines(content string, aliases []string) (string, i
 	return builder.String(), removed, unsafe
 }
 
+func removeKotlinAndroidCatalogEntries(content string) (string, int) {
+	model := parseCatalog(content)
+	remove := map[int]bool{}
+	for _, entry := range model.entries {
+		if entry.section == "plugins" && entry.isKotlin {
+			remove[entry.line] = true
+		}
+	}
+	if len(remove) == 0 {
+		return content, 0
+	}
+	lineEnding := "\n"
+	if strings.Contains(content, "\r\n") {
+		lineEnding = "\r\n"
+	}
+	lines := strings.Split(strings.ReplaceAll(content, "\r\n", "\n"), "\n")
+	kept := make([]string, 0, len(lines)-len(remove))
+	for index, line := range lines {
+		if !remove[index] {
+			kept = append(kept, line)
+		}
+	}
+	return strings.Join(kept, lineEnding), len(remove)
+}
+
 func containsKotlinAndroidPlugin(line string, aliases []string) bool {
 	if kotlinAndroidIDPattern.MatchString(line) || kotlinAndroidCallPattern.MatchString(line) {
 		return true

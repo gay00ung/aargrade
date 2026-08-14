@@ -11,6 +11,7 @@ import (
 	consumer "github.com/gay00ung/aargrade/internal/matrix"
 	"github.com/gay00ung/aargrade/internal/migration"
 	"github.com/gay00ung/aargrade/internal/model"
+	"github.com/gay00ung/aargrade/internal/upgrade"
 	verification "github.com/gay00ung/aargrade/internal/verify"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -42,6 +43,31 @@ type MigrateInput struct {
 type MigrateRollbackInput struct {
 	ProjectPath string `json:"projectPath,omitempty" jsonschema:"Gradle project root. Defaults to the current directory."`
 	Apply       bool   `json:"apply,omitempty" jsonschema:"Restore unchanged migrated files and remove ownership state. Defaults to false."`
+}
+
+type MigrateAcceptInput struct {
+	ProjectPath string `json:"projectPath,omitempty" jsonschema:"Gradle project root. Defaults to the current directory."`
+	Apply       bool   `json:"apply,omitempty" jsonschema:"Keep exact migrated files and remove rollback state. Defaults to false."`
+}
+
+type UpgradeInput struct {
+	ProjectPath         string            `json:"projectPath,omitempty" jsonschema:"Gradle project root. Defaults to the current directory."`
+	TargetAGP           string            `json:"targetAgp" jsonschema:"Target Android Gradle Plugin version, for example 9.2.0."`
+	CurrentAGP          string            `json:"currentAgp,omitempty" jsonschema:"Verified current AGP override."`
+	LibraryPath         string            `json:"libraryPath,omitempty" jsonschema:"Android library Gradle path, for example :sdk."`
+	Variant             string            `json:"variant,omitempty" jsonschema:"Android library build variant. Defaults to release."`
+	BaselineAAR         string            `json:"baselineAar,omitempty" jsonschema:"Released baseline AAR for compatibility comparison."`
+	MatrixConfig        string            `json:"matrixConfig,omitempty" jsonschema:"Optional consumer matrix YAML configuration."`
+	MatrixWorkDirectory string            `json:"matrixWorkDirectory,omitempty" jsonschema:"Owned directory for generated matrix evidence."`
+	SelectedCells       []string          `json:"selectedCells,omitempty" jsonschema:"Only run these named matrix cells."`
+	Apply               bool              `json:"apply,omitempty" jsonschema:"Apply repairs and run Gradle evidence. Defaults to false."`
+	KeepFailedChanges   bool              `json:"keepFailedChanges,omitempty" jsonschema:"Preserve owned changes when verification fails. Defaults to false, so failures roll back."`
+	AllowDownloads      bool              `json:"allowDownloads,omitempty" jsonschema:"Allow checksum-verified matrix Gradle downloads."`
+	FailFast            bool              `json:"failFast,omitempty" jsonschema:"Stop the consumer matrix after the first regression."`
+	GradleArgs          []string          `json:"gradleArgs,omitempty" jsonschema:"Extra arguments appended to project Gradle commands."`
+	TimeoutSeconds      int               `json:"timeoutSeconds,omitempty" jsonschema:"Timeout for each Gradle command in seconds. Defaults to 900."`
+	JavaHomes           map[string]string `json:"javaHomes,omitempty" jsonschema:"JDK major to JAVA_HOME matrix mapping."`
+	GradleExecutables   map[string]string `json:"gradleExecutables,omitempty" jsonschema:"Gradle version to executable matrix mapping."`
 }
 
 type VerifyInput struct {
@@ -139,6 +165,19 @@ func New(version string) *mcp.Server {
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
+		Name:        "aargrade_migrate_accept",
+		Title:       "Preview or accept migration",
+		Description: "Keep exact applied migration files and remove rollback ownership state only while every file still matches its recorded applied hash.",
+		Annotations: destructiveAnnotations("Preview or accept migration"),
+	}, func(_ context.Context, _ *mcp.CallToolRequest, input MigrateAcceptInput) (*mcp.CallToolResult, migration.MutationResult, error) {
+		result, err := migration.Accept(migration.AcceptOptions{
+			ProjectPath: defaultString(input.ProjectPath, "."),
+			Apply:       input.Apply,
+		})
+		return nil, result, err
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
 		Name:        "aargrade_migrate_rollback",
 		Title:       "Preview or apply migration rollback",
 		Description: "Restore exact pre-migration Gradle files only while every owned file still matches its recorded before or after hash.",
@@ -149,6 +188,44 @@ func New(version string) *mcp.Server {
 			Apply:       input.Apply,
 		})
 		return nil, result, err
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "aargrade_upgrade",
+		Title:       "Run an agent-style AGP upgrade",
+		Description: "Preview or run deterministic repairs, AGP migration, Gradle help/dry-run/AAR assembly, compatibility inspection, and an optional consumer matrix. Failed applies roll back unless keepFailedChanges is true.",
+		Annotations: destructiveAnnotations("Run an agent-style AGP upgrade"),
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, input UpgradeInput) (*mcp.CallToolResult, upgrade.Report, error) {
+		timeout, err := timeoutDuration(input.TimeoutSeconds, 15*time.Minute)
+		if err != nil {
+			return nil, upgrade.Report{}, err
+		}
+		javaHomes, err := parseJavaHomes(input.JavaHomes)
+		if err != nil {
+			return nil, upgrade.Report{}, err
+		}
+		report, err := upgrade.Run(upgrade.Options{
+			Context:             ctx,
+			ProjectPath:         defaultString(input.ProjectPath, "."),
+			TargetAGP:           input.TargetAGP,
+			CurrentAGPOverride:  input.CurrentAGP,
+			LibraryPath:         input.LibraryPath,
+			Variant:             defaultString(input.Variant, "release"),
+			BaselineAAR:         input.BaselineAAR,
+			MatrixConfig:        input.MatrixConfig,
+			MatrixWorkDirectory: input.MatrixWorkDirectory,
+			SelectedCells:       input.SelectedCells,
+			Apply:               input.Apply,
+			RollbackOnFailure:   !input.KeepFailedChanges,
+			AllowDownloads:      input.AllowDownloads,
+			KeepGoing:           !input.FailFast,
+			GradleArgs:          input.GradleArgs,
+			Timeout:             timeout,
+			ToolVersion:         version,
+			JavaHomes:           javaHomes,
+			GradleExecutables:   input.GradleExecutables,
+		})
+		return nil, report, err
 	})
 
 	mcp.AddTool(server, &mcp.Tool{

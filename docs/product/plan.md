@@ -11,6 +11,10 @@
   version-catalog, Wrapper/checksum, and simple AGP 9 Built-in Kotlin changes.
   It records a hash-owned transaction and supports exact rollback; ambiguous
   DSL, kapt, old KSP, buildSrc, and legacy APIs fail closed.
+- An agent-style `upgrade` orchestrator now composes diagnosis, deterministic
+  repairs, migration, real Gradle/AAR verification, optional consumer cells,
+  failure classification, and default rollback. A dedicated legacy-DSL fixture
+  passes the complete AGP 8.8 → 9.2 lifecycle.
 - Milestone 3 is implemented and Gate D passed locally: the public AAR built in
   AGP 4.2.2 and 9.2.0 Java/Kotlin consumers with explicit JDK 11/17. CI is
   configured to repeat all four cells.
@@ -61,9 +65,10 @@ value is orchestration and one compatibility verdict across those seams.
 AARGrade is a CLI first. The Gradle plugin, CI adapters, and MCP server must call
 the same domain operations and consume the same versioned report schema.
 
-AARGrade does not replace Android Studio's AGP Upgrade Assistant, Metalava,
-binary compatibility validators, Diffuse, Gradle, R8, or Android Lint. It will
-detect, invoke, and consolidate those tools where their contracts are stable.
+AARGrade does not automate Android Studio UI or replace specialist engines such
+as Metalava, binary compatibility validators, Diffuse, Gradle, R8, or Android
+Lint. Its `upgrade` command provides a headless, evidence-first path for known
+AGP recipes and exposes unresolved work to an MCP agent or maintainer.
 
 ## Command delivery status
 
@@ -72,7 +77,9 @@ detect, invoke, and consolidate those tools where their contracts are stable.
 | `doctor` | Read-only inventory and migration-risk findings | Implemented |
 | `host add/remove` | Reversible temporary application host with ownership proof | Implemented; controlled Upgrade Assistant workaround validated |
 | `plan --target-agp` | Version-aware migration plan, without source mutation | Implemented |
+| `upgrade --target-agp` | Agent-style repair, migration, build/AAR evidence, optional matrix, and failure rollback | Implemented; real AGP 9 fixture passes end to end |
 | `migrate --target-agp` / `migrate rollback` | Bounded preview/apply and hash-owned exact restore | Implemented; AGP 8.8 Kotlin catalog fixture builds on AGP 9.2 |
+| `migrate accept` | Keep exact applied files and safely discard rollback state | Implemented |
 | `verify` | Candidate build, AAR/JVM linkage, metadata, R8, and JNI packaging evidence | Implemented with documented limits |
 | `matrix` | Real Java/Kotlin consumer builds across declared toolchains | Implemented; four endpoint cells proven |
 | `mcp serve` | Agent interface over the shared domain contract | Implemented |
@@ -167,6 +174,20 @@ The MCP server and a future Gradle plugin are adapters only. They may not
 duplicate project detection, policy evaluation, mutation safety, or report
 rendering. The MCP server now calls the same domain packages directly; the
 Gradle plugin remains a future integration.
+
+## Milestone 5: agent-style upgrade orchestration
+
+`upgrade` is the primary user entry point. It must remain preview-first and
+compose existing domain operations instead of maintaining a second migration
+or verification engine. A successful applied run must prove project
+configuration, task graph, AAR assembly, and artifact checks requested by the
+user. A failed or incomplete run must retain bounded evidence, classify a
+useful cause, and restore owned configuration by default.
+
+Known deterministic repair recipes may expand only with fixture coverage and a
+fail-closed ambiguity rule. Arbitrary convention logic and source semantics are
+not silently guessed; MCP agents may use structured blockers and Gradle output
+to handle those project-specific cases before rerunning the same operation.
 
 ## Validation gates
 

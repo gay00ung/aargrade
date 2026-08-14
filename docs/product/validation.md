@@ -125,8 +125,8 @@ environment, checksums, logs, protocol, and bounded conclusion are in the
 
 - `go install github.com/gay00ung/aargrade/cmd/aargrade@latest` successfully
   installed the pushed repository into an empty temporary binary directory.
-- `make demo` diagnoses and previews host creation against
-  `examples/library-only` without changing the example tree.
+- `make demo` diagnoses, plans, and previews the agent-style upgrade plus host
+  creation against `examples/library-only` without changing the example tree.
 - `TestPublicExampleUserJourney` runs the public example through doctor, host
   preview, host apply, removal preview, and removal apply, then verifies exact
   settings restoration.
@@ -245,19 +245,55 @@ fixture rather than a consumer regression.
 - The server uses the official Tier-1
   [Model Context Protocol Go SDK](https://modelcontextprotocol.io/docs/sdk),
   currently pinned to `github.com/modelcontextprotocol/go-sdk` v1.7.0.
-- Eight tools call the same domain packages as the CLI: doctor, plan, migrate,
-  migrate rollback, verify, matrix, host add, and host remove. There is no
-  subprocess parsing or duplicate policy engine.
+- Ten tools call the same domain packages as the CLI: doctor, plan, upgrade,
+  migrate, migrate accept, migrate rollback, verify, matrix, host add, and host
+  remove. There is no subprocess parsing or duplicate policy engine.
 - Typed input/output schemas are inferred by the SDK. Read-only, additive,
   open-world, and destructive annotations reflect the operations; host apply
   and Gradle downloads remain explicit opt-ins.
 - Tests negotiate an in-memory session, list and call typed tools, verify that
   invalid input becomes a tool-visible error, and launch a separate real stdio
-  server process to negotiate and list all eight tools.
+  server process to negotiate and list all ten tools.
 - Verification and matrix operations propagate MCP cancellation into Gradle,
   JDK, Gradle validation, and HTTP download contexts.
 
 This proves protocol behavior, not broad external demand for the integration.
+
+## Milestone 5 agent-style upgrade evidence
+
+- `upgrade` is preview-only unless `--apply` is supplied. Preview produces the
+  complete owned diff without invoking Gradle or changing the fixture tree.
+- The deterministic repair layer handles a literal manifest-derived namespace
+  plus removal of that legacy source-manifest package attribute, implicit
+  custom BuildConfig enablement, numeric legacy SDK setter syntax,
+  simple `android.kotlinOptions.jvmTarget`, matching Java compile targets,
+  Kotlin Android plugin/catalog removal, obsolete AGP 9 properties, AGP, and
+  the checksum-pinned Wrapper.
+- The dedicated `upgrade-agent` fixture begins on AGP 8.8/Gradle 8.10.2 with no
+  namespace, custom BuildConfig while disabled, `compileSdkVersion`,
+  `minSdkVersion`, and `kotlinOptions`. One `upgrade --apply` migrated it to AGP
+  9.2/Gradle 9.4.1, passed Wrapper `help`, `build --dry-run`, Built-in Kotlin
+  release compilation, AAR assembly, structure, metadata, and Consumer R8
+  inspection with JDK 17 and Android platform 35.
+- The first real run exposed inconsistent Java 11/Kotlin 17 targets. That
+  evidence led to the explicit Java/Kotlin alignment recipe and a dedicated
+  failure category instead of weakening the fixture.
+- A failed applied verification is categorized and exact owned configuration is
+  automatically rolled back by default. Unit tests inject a Gradle namespace
+  failure and verify both the category and byte-exact restoration.
+- A separate permission-failure test stops the multi-file write after ownership
+  state and earlier files were written, then verifies that `upgrade` classifies
+  the incomplete apply and restores every partial change automatically.
+- A passed run keeps rollback state. `migrate accept` removes it only when all
+  owned files still match their exact applied hashes; later edits and partial
+  transactions fail closed.
+- `scripts/upgrade-agent-smoke.sh` and CI repeat the complete repair, migration,
+  real build/AAR inspection, and exact rollback lifecycle.
+
+This is assistant-style orchestration, not a claim that the standalone CLI can
+semantically rewrite arbitrary Gradle programs. Project-specific blockers are
+returned through CLI JSON and `aargrade_upgrade` so an MCP agent or maintainer
+can continue the loop.
 
 ## Dependency and toolchain security evidence
 

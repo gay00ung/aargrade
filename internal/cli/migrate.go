@@ -12,6 +12,8 @@ import (
 func runMigrate(args []string, stdout, stderr io.Writer, version string) int {
 	if len(args) > 0 {
 		switch args[0] {
+		case "accept":
+			return runMigrateAccept(args[1:], stdout, stderr)
 		case "rollback":
 			return runMigrateRollback(args[1:], stdout, stderr)
 		case "help", "-h", "--help":
@@ -58,6 +60,47 @@ func runMigrate(args []string, stdout, stderr io.Writer, version string) int {
 	}
 	if err := renderMutation(stdout, result, *format); err != nil {
 		_, _ = fmt.Fprintf(stderr, "aargrade migrate: write report: %s\n", err)
+		return 2
+	}
+	if !result.Ready {
+		return 1
+	}
+	return 0
+}
+
+func runMigrateAccept(args []string, stdout, stderr io.Writer) int {
+	flags := flag.NewFlagSet("migrate accept", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	projectPath := flags.String("project", ".", "Gradle project root")
+	apply := flags.Bool("apply", false, "remove rollback state and keep the exact migrated files")
+	format := flags.String("format", "text", "output format: text or json")
+	flags.Usage = func() {
+		_, _ = fmt.Fprintln(flags.Output(), "Usage: aargrade migrate accept [options]")
+		_, _ = fmt.Fprintln(flags.Output(), "\nKeep exact migrated files and remove rollback state. Preview-only by default.")
+		_, _ = fmt.Fprintln(flags.Output(), "\nOptions:")
+		flags.PrintDefaults()
+	}
+	if err := flags.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 2
+	}
+	if flags.NArg() != 0 {
+		_, _ = fmt.Fprintf(stderr, "aargrade migrate accept: unexpected argument %q\n", flags.Arg(0))
+		return 2
+	}
+	if !validMutationFormat(*format) {
+		_, _ = fmt.Fprintf(stderr, "aargrade migrate accept: unsupported format %q (use text or json)\n", *format)
+		return 2
+	}
+	result, err := migration.Accept(migration.AcceptOptions{ProjectPath: *projectPath, Apply: *apply})
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "aargrade migrate accept: %s\n", err)
+		return 2
+	}
+	if err := renderMutation(stdout, result, *format); err != nil {
+		_, _ = fmt.Fprintf(stderr, "aargrade migrate accept: write report: %s\n", err)
 		return 2
 	}
 	if !result.Ready {
@@ -121,6 +164,7 @@ func renderMutation(writer io.Writer, result migration.MutationResult, format st
 func printMigrateUsage(writer io.Writer) {
 	_, _ = fmt.Fprintln(writer, `Usage:
   aargrade migrate --target-agp VERSION [options]
+  aargrade migrate accept [options]
   aargrade migrate rollback [options]
 
 The default is a no-write preview. --apply updates only statically proven AGP,

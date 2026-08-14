@@ -29,7 +29,7 @@ func Migrate(options MutationOptions) (MutationResult, error) {
 	}
 	statePath := filepath.Join(discovered.Root, filepath.FromSlash(stateRelativePath))
 	if _, err := os.Lstat(statePath); err == nil {
-		return MutationResult{}, fmt.Errorf("an active migration state already exists at %s; run `aargrade migrate rollback` first", stateRelativePath)
+		return MutationResult{}, fmt.Errorf("an active migration state already exists at %s; run `aargrade migrate rollback` or `aargrade migrate accept` first", stateRelativePath)
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return MutationResult{}, fmt.Errorf("inspect migration state: %w", err)
 	}
@@ -89,14 +89,16 @@ func Migrate(options MutationOptions) (MutationResult, error) {
 	}
 
 	if targetVersion.Major >= 8 {
-		result.Blockers = append(result.Blockers, namespaceBlockers(discovered)...)
-		if hasFindingID(diagnosis, "android.buildconfig.feature-implicit") {
+		if !options.AutoRepair {
+			result.Blockers = append(result.Blockers, namespaceBlockers(discovered)...)
+		}
+		if !options.AutoRepair && hasFindingID(diagnosis, "android.buildconfig.feature-implicit") {
 			result.Blockers = append(result.Blockers, "android.buildconfig.feature-implicit: custom BuildConfig fields require an explicit buildFeatures.buildConfig = true migration")
 		}
 	}
 	result.Blockers = append(result.Blockers, mutationStructureBlockers(discovered, diagnosis)...)
 	if targetVersion.Major >= 9 {
-		result.Blockers = append(result.Blockers, agp9MutationBlockers(discovered, diagnosis, allBuildFiles, catalog)...)
+		result.Blockers = append(result.Blockers, agp9MutationBlockers(discovered, diagnosis, allBuildFiles, catalog, options.AutoRepair)...)
 	}
 
 	result.Blockers = sortAndUniqueStrings(result.Blockers)
@@ -156,6 +158,15 @@ func Migrate(options MutationOptions) (MutationResult, error) {
 		return result, nil
 	}
 
+	if options.AutoRepair {
+		applyAssistantRepairs(discovered, targetVersion.Major, buildFiles, contents, filesByRelative, &result)
+		result.Blockers = append(result.Blockers, assistantRepairBlockers(discovered, targetVersion.Major, buildFiles, contents)...)
+		if len(result.Blockers) > 0 {
+			result.Blockers = sortAndUniqueStrings(result.Blockers)
+			return result, nil
+		}
+	}
+
 	if targetVersion.Major >= 9 {
 		kotlinAliases := catalogAliases(catalog, func(entry catalogEntry) bool { return entry.isKotlin })
 		removed := 0
@@ -178,7 +189,17 @@ func Migrate(options MutationOptions) (MutationResult, error) {
 			return result, nil
 		}
 		if removed > 0 {
-			result.Warnings = append(result.Warnings, fmt.Sprintf("AGP 9 Built-in Kotlin을 위해 Kotlin Android plugin 선언 %d개를 제거합니다. Kotlin 컴파일 옵션이 없는 단순 구성만 자동 지원합니다.", removed))
+			result.Warnings = append(result.Warnings, fmt.Sprintf("AGP 9 Built-in Kotlin을 위해 Kotlin Android plugin 선언 %d개를 제거합니다.", removed))
+		}
+		if catalogFile != nil {
+			updated, removedCatalogEntries := removeKotlinAndroidCatalogEntries(contents[catalogFile.relative])
+			contents[catalogFile.relative] = updated
+			if removedCatalogEntries > 0 {
+				result.Repairs = append(result.Repairs, Repair{
+					ID: "agp9.built-in-kotlin.catalog", Path: catalogFile.relative,
+					Summary: fmt.Sprintf("사용하지 않게 된 Kotlin Android plugin catalog 선언 %d개를 제거", removedCatalogEntries),
+				})
+			}
 		}
 		if discovered.GradlePropertiesFile != "" {
 			relative, relErr := migrationRelative(discovered.Root, discovered.GradlePropertiesFile)
@@ -298,7 +319,7 @@ func Migrate(options MutationOptions) (MutationResult, error) {
 	result.Ready = true
 	if options.Apply {
 		if err := applyMigration(&result); err != nil {
-			return MutationResult{}, err
+			return result, err
 		}
 		result.Applied = true
 	}
@@ -387,7 +408,7 @@ func mutationStructureBlockers(discovered *project.Project, diagnosis model.Repo
 	return blockers
 }
 
-func agp9MutationBlockers(discovered *project.Project, diagnosis model.Report, files []migrationFile, catalog catalogModel) []string {
+func agp9MutationBlockers(discovered *project.Project, diagnosis model.Report, files []migrationFile, catalog catalogModel, autoRepair bool) []string {
 	var blockers []string
 	if hasFindingID(diagnosis, "agp9.legacy-api") {
 		blockers = append(blockers, "agp9.legacy-api: legacy Variant/internal API는 androidComponents/public DSL로 수동 전환해야 합니다.")
@@ -398,18 +419,22 @@ func agp9MutationBlockers(discovered *project.Project, diagnosis model.Report, f
 		}
 	}
 	for _, file := range files {
-		blockers = append(blockers, patternLocations(file, kotlinOptionsPattern, "Kotlin compiler/source-set DSL requires a manual Built-in Kotlin migration")...)
+		if !autoRepair {
+			blockers = append(blockers, patternLocations(file, kotlinOptionsPattern, "Kotlin compiler/source-set DSL requires a manual Built-in Kotlin migration")...)
+		}
 		clean := project.StripComments(file.content)
 		if kotlinBlockPattern.MatchString(clean) && sourceSetsPattern.MatchString(clean) {
 			blockers = append(blockers, file.relative+": kotlin { sourceSets ... } requires migration to android.sourceSets Kotlin directories")
 		}
 		blockers = append(blockers, patternLocations(file, javaKotlinSourceDirPattern, "Kotlin sources configured through Java source dirs require android.sourceSets Kotlin migration")...)
 		blockers = append(blockers, patternLocations(file, removedAGP9DSLPattern, "legacy or removed AGP 9 DSL/API requires manual migration")...)
-		blockers = append(blockers, patternLocations(file, legacySDKMethodPattern, "legacy Android SDK setter DSL requires manual migration")...)
+		if !autoRepair {
+			blockers = append(blockers, patternLocations(file, legacySDKMethodPattern, "legacy Android SDK setter DSL requires manual migration")...)
+		}
 		if kmpPattern.MatchString(clean) && androidPluginPattern.MatchString(clean) {
 			blockers = append(blockers, file.relative+": Kotlin Multiplatform with a legacy Android plugin requires the AGP 9 KMP plugin migration")
 		}
-		if buildConfigFieldMutationPattern.MatchString(clean) && !buildConfigEnabledMutationPattern.MatchString(clean) {
+		if !autoRepair && buildConfigFieldMutationPattern.MatchString(clean) && !buildConfigEnabledMutationPattern.MatchString(clean) {
 			blockers = append(blockers, file.relative+": buildConfigField requires explicit buildFeatures.buildConfig = true")
 		}
 	}
@@ -483,6 +508,7 @@ func applyMigration(result *MutationResult) error {
 	if err := atomicMigrationWrite(result.statePath, stateData, 0o600); err != nil {
 		return fmt.Errorf("write prepared migration state: %w", err)
 	}
+	result.TransactionStarted = true
 	for _, change := range result.Changes {
 		absolute, _ := migrationJoin(result.ProjectRoot, change.Path)
 		current, readErr := os.ReadFile(absolute)

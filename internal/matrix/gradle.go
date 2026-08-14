@@ -16,6 +16,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/gay00ung/aargrade/internal/process"
 )
 
 const (
@@ -70,7 +72,7 @@ func validateGradleExecutable(parent context.Context, value, expected string) (s
 	}
 	ctx, cancel := context.WithTimeout(parent, 30*time.Second)
 	defer cancel()
-	output, err := exec.CommandContext(ctx, absolute, "--version").CombinedOutput()
+	output, err := process.CommandContext(ctx, absolute, "--version").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("run %s --version: %w", absolute, err)
 	}

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gay00ung/aargrade/internal/evidence"
+	"github.com/gay00ung/aargrade/internal/process"
 	"github.com/gay00ung/aargrade/internal/project"
 )
 
@@ -137,7 +138,7 @@ func execute(parent context.Context, timeout time.Duration, directory, executabl
 	}
 	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
-	command := exec.CommandContext(ctx, executable, args...)
+	command := process.CommandContext(ctx, executable, args...)
 	command.Dir = directory
 	var output limitedBuffer
 	command.Stdout = &output

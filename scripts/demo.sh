@@ -26,8 +26,8 @@ run_aargrade plan \
   --project "${example_project}" \
   --target-agp 9.3.0
 
-printf '\nAARGrade public example: bounded migration preview\n\n'
-run_aargrade migrate \
+printf '\nAARGrade public example: agent-style upgrade preview\n\n'
+run_aargrade upgrade \
   --project "${example_project}" \
   --target-agp 9.3.0
 

@@ -17,6 +17,7 @@ import (
 
 	"github.com/gay00ung/aargrade/internal/artifact"
 	"github.com/gay00ung/aargrade/internal/evidence"
+	"github.com/gay00ung/aargrade/internal/process"
 )
 
 const maxMatrixOutput = 256 << 10
@@ -125,7 +126,7 @@ func runArtifact(parent context.Context, cellDirectory, label string, cell CellC
 	}
 	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
-	command := exec.CommandContext(ctx, gradle, args...)
+	command := process.CommandContext(ctx, gradle, args...)
 	command.Dir = projectDirectory
 	command.Env = environmentWithJavaHome(javaHome)
 	var output cappedBuffer
@@ -181,7 +182,7 @@ func resolveJavaHome(parent context.Context, cell CellConfig, overrides map[int]
 	java := filepath.Join(absolute, "bin", javaName)
 	ctx, cancel := context.WithTimeout(parent, 30*time.Second)
 	defer cancel()
-	output, err := exec.CommandContext(ctx, java, "-version").CombinedOutput()
+	output, err := process.CommandContext(ctx, java, "-version").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("run JDK %d from %s: %w", cell.JDK, absolute, err)
 	}

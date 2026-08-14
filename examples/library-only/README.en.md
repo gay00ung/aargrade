@@ -12,8 +12,8 @@ From the AARGrade repository root:
 make demo
 ```
 
-The demo runs a read-only diagnosis, creates an AGP 9.3 plan, and previews a
-temporary host. It does not change this project.
+The demo runs a read-only diagnosis, creates an AGP 9.3 plan, and previews the
+agent-style upgrade plus a temporary host. It does not change this project.
 
 To exercise the complete reversible host lifecycle on a disposable copy:
 

@@ -73,6 +73,83 @@ Exit codes:
 - `2`: invalid input, unsupported policy line, failed analysis, or output
   failure.
 
+## `upgrade`
+
+```bash
+# No-write, no-build preview
+aargrade upgrade \
+  --project /path/to/project \
+  --target-agp 9.2.0
+
+# Apply repairs and run project/AAR evidence
+aargrade upgrade \
+  --project /path/to/project \
+  --target-agp 9.2.0 \
+  --library :sdk \
+  --baseline-aar /path/to/released.aar \
+  --apply
+```
+
+Options:
+
+- `--project`: Gradle root. Default: `.`.
+- `--target-agp`: required target AGP version.
+- `--current-agp`: reviewed current-version override.
+- `--library`: Android library Gradle path when discovery is ambiguous.
+- `--variant`: library variant to assemble. Default: `release`.
+- `--baseline-aar`: optional released AAR for ABI/metadata/JNI comparison.
+- `--matrix-config`: optional strict consumer-matrix YAML. When omitted, no
+  consumer cells run.
+- `--matrix-work-dir`: optional owned matrix evidence directory.
+- `--cell`: selected matrix cell; repeatable.
+- `--apply`: apply configuration repairs and run Gradle/AAR evidence. Default:
+  false.
+- `--keep-failed-changes`: disable the default automatic rollback after a
+  failed or incomplete applied run.
+- `--allow-downloads`: allow checksum-verified Gradle downloads for matrix
+  cells. Default: false.
+- `--fail-fast`: stop the optional matrix at its first regression.
+- `--gradle-arg`: extra argument appended to each project Gradle command;
+  repeatable.
+- `--java-home MAJOR=PATH` and `--gradle-bin VERSION=EXECUTABLE`: optional
+  matrix toolchain overrides; repeatable.
+- `--timeout`: timeout for each Gradle/build operation. Default: `15m`.
+- `--format`: `text` or `json`.
+
+Preview calls the same migration engine with agent repairs enabled but writes
+nothing and does not invoke Gradle. Apply mode performs this sequence:
+
+1. discover and statically diagnose the project;
+2. prepare one hash-owned transaction for supported AGP, Wrapper, and AGP 9
+   changes;
+3. repair safely recognized forms of a missing namespace and its legacy source
+   manifest package, implicit custom BuildConfig feature, numeric legacy SDK setters, simple
+   `android.kotlinOptions.jvmTarget`, and missing Java target alignment;
+4. run Wrapper `help`, `build --dry-run`, and selected library assembly;
+5. inspect the candidate AAR and compare the optional baseline;
+6. run the optional consumer matrix; and
+7. classify a failure and automatically roll back the owned configuration,
+   unless `--keep-failed-changes` was explicitly supplied.
+
+The repair engine is deterministic, not a bundled language model. Existing
+Java target declarations, complex Kotlin compiler/source-set blocks, kapt/KSP
+decisions, convention-plugin internals, legacy Variant APIs, and ambiguous
+dynamic logic remain blockers or project-specific agent work. Over MCP, the
+structured blockers and bounded Gradle output let an external agent edit those
+project-specific cases and rerun `aargrade_upgrade`.
+
+A successful run leaves rollback state for review. Use `migrate rollback` to
+restore exact originals or `migrate accept` to keep exact applied files and
+remove that state.
+
+Exit codes:
+
+- `0`: applicable preview or all requested applied evidence passed.
+- `1`: static blocker, Gradle/AAR failure, or consumer regression. Applied
+  owned changes are rolled back by default.
+- `2`: incomplete environment/matrix, invalid input or state, or another error
+  prevented a trustworthy requested verdict.
+
 ## `migrate`
 
 ```bash
@@ -158,6 +235,28 @@ Exit codes:
 - `1`: at least one owned file changed and automatic rollback was refused.
 - `2`: state is missing/invalid, an owned path is unsafe, or another
   input/output failure prevented a trustworthy result.
+
+## `migrate accept`
+
+```bash
+aargrade migrate accept --project /path/to/project
+aargrade migrate accept --project /path/to/project --apply
+```
+
+Options are `--project`, `--apply`, and `--format`. Preview is the default.
+Accept requires a fully applied transaction and requires every owned project
+file to still match its exact recorded post-migration SHA-256. Apply removes
+only `.aargrade/state/migration.json` and empty ownership directories; it keeps
+all migrated Gradle files unchanged. A partial rollback or any later edit
+blocks automatic acceptance so rollback protection is not silently discarded.
+
+Exit codes:
+
+- `0`: applicable accept preview or applied state removal.
+- `1`: the transaction or an owned file no longer matches the exact applied
+  state.
+- `2`: state is missing/invalid, a path is unsafe, or another input/output
+  failure prevented a trustworthy result.
 
 ## `verify`
 
@@ -386,7 +485,9 @@ protocol traffic; operational failures go to stderr. It exposes:
 
 - `aargrade_doctor`
 - `aargrade_plan`
+- `aargrade_upgrade`
 - `aargrade_migrate`
+- `aargrade_migrate_accept`
 - `aargrade_migrate_rollback`
 - `aargrade_verify`
 - `aargrade_matrix`
@@ -405,8 +506,9 @@ MCP input schemas. Closing stdin ends the server session. Process exit code is
 
 ## JSON compatibility
 
-Doctor reports, migration plans, mutation/rollback results, host plans,
-verification reports, and matrix reports currently use `schemaVersion: 1`.
+Doctor reports, migration plans, upgrade reports, mutation/accept/rollback
+results, host plans, verification reports, and matrix reports currently use
+`schemaVersion: 1`.
 Within a schema version, new fields may be additive, but existing verdict
 semantics must not change. A breaking rename or semantic change requires a new
 schema version.

@@ -13,14 +13,20 @@ project, plan the toolchain change, inspect the candidate AAR, and build that
 artifact in isolated old and current Java/Kotlin consumers.
 
 ```text
-diagnose → plan → preview/apply bounded migration → build/compare AAR → build consumer matrix → report
+diagnose → preview repairs → migrate → build/inspect AAR → optional consumer matrix → classify failure/roll back
 ```
 
+Start with `upgrade`. It orchestrates diagnosis, known AGP repairs, migration,
+real Gradle/AAR evidence, and an optional consumer matrix. Failed applies roll
+back owned changes by default. Use `migrate` when you want to control only the
+configuration transaction without running Gradle.
+
 AARGrade does not guess how to rewrite arbitrary Gradle logic or claim universal
-compatibility. `migrate` edits only statically proven AGP declarations, Wrapper
-configuration, and simple AGP 9 Built-in Kotlin cases. It previews by default,
-requires `--apply`, records exact rollback state, and blocks kapt, legacy APIs,
-and other ambiguous structures with an explanation.
+compatibility. Automatic repairs cover only statically provable forms from
+official AGP migration rules. kapt, legacy APIs, convention-plugin internals,
+and other ambiguous structures stop with a reason and suggested next action.
+Over MCP, an agent can consume that structured result, make project-specific
+changes, and rerun the same evidence loop.
 
 ## Implemented commands
 
@@ -28,7 +34,8 @@ and other ambiguous structures with an explanation.
 | --- | --- | --- |
 | `doctor` | Read-only project and AGP migration diagnosis | None |
 | `plan` | Ordered target-AGP, Gradle, and JDK migration plan | None |
-| `migrate` | Preview/apply/rollback supported AGP, Wrapper, and Built-in Kotlin edits | Only with `--apply` |
+| `upgrade` | Repair, migrate, build, inspect, and optionally test consumers in one flow | Preview writes nothing; `--apply` changes configuration/builds |
+| `migrate` | Preview/apply/accept/rollback supported AGP, Wrapper, and Built-in Kotlin edits | Only with `--apply` |
 | `verify` | Build/inspect an AAR and compare it with a baseline | May create normal Gradle build outputs |
 | `matrix` | Build isolated Java/Kotlin consumer applications | Evidence under `.aargrade/matrix` |
 | `host add/remove` | Add/remove an owned app model for Upgrade Assistant | Only with `--apply` |
@@ -49,7 +56,7 @@ cd aargrade
 make demo
 ```
 
-It runs `doctor`, creates an AGP 9.3 `plan`, and previews both `migrate` and
+It runs `doctor`, creates an AGP 9.3 `plan`, and previews both `upgrade` and
 `host add` against the public
 [`examples/library-only`](examples/library-only/README.en.md) project. It does
 not change the example.
@@ -96,6 +103,47 @@ Before that tag exists, or when testing the development checkout, run
 `make build VERSION=dev` and use `./bin/aargrade`.
 
 ## End-to-end workflow
+
+Preview the recommended end-to-end operation first. It does not write project
+files or run Gradle:
+
+```bash
+aargrade upgrade --project . --target-agp 9.2.0
+```
+
+Then apply the reviewed repairs and produce real evidence:
+
+```bash
+aargrade upgrade \
+  --project . \
+  --target-agp 9.2.0 \
+  --library :sdk \
+  --baseline-aar releases/sdk-current.aar \
+  --apply
+```
+
+The baseline is optional. Apply mode updates AGP and the Wrapper, repairs safe
+forms of missing namespace plus its legacy manifest package, custom BuildConfig
+enablement, legacy SDK setters, AGP 9 Built-in Kotlin, and Java/Kotlin JVM
+target alignment. It then runs `help`, `build --dry-run`, release AAR assembly,
+and AAR inspection. Add
+`--matrix-config aargrade.yml` to run declared consumers too. A failure is
+classified and rolls the owned configuration back unless
+`--keep-failed-changes` is explicitly supplied.
+
+After a pass, either preview/apply exact rollback or accept the migration and
+remove its rollback state while leaving the migrated files intact:
+
+```bash
+aargrade migrate rollback --project .
+aargrade migrate rollback --project . --apply
+
+aargrade migrate accept --project .
+aargrade migrate accept --project . --apply
+```
+
+The lower-level commands below remain useful when each stage should be run
+separately.
 
 Diagnose the Gradle root without running Gradle or changing files:
 
@@ -262,11 +310,12 @@ your client's documentation:
 }
 ```
 
-The server exposes `aargrade_doctor`, `aargrade_plan`, `aargrade_migrate`,
+The server exposes `aargrade_doctor`, `aargrade_plan`, `aargrade_upgrade`,
+`aargrade_migrate`, `aargrade_migrate_accept`,
 `aargrade_migrate_rollback`, `aargrade_verify`, `aargrade_matrix`,
 `aargrade_host_add`, and `aargrade_host_remove` with inferred input/output
-schemas and structured results. Mutation `apply` and matrix `allowDownloads`
-default to `false`.
+schemas and structured results. Mutation `apply` and `allowDownloads` default
+to `false`.
 
 ## CI and tests
 
@@ -293,6 +342,7 @@ Run the reproducible host lifecycle alone with:
 ```bash
 make test-upgrade-assistant-fixture
 make test-migration-smoke
+make test-upgrade-agent-smoke
 ```
 
 CI runs Go tests on Linux, macOS, and Windows, builds the public example AAR,
@@ -307,6 +357,9 @@ remains explicitly manual evidence rather than a headless-build substitute.
 The `migration-smoke` job migrates a real Kotlin/version-catalog fixture from
 AGP 8.8 to AGP 9.2/Gradle 9.4.1, compiles Kotlin through AGP's Built-in Kotlin,
 assembles the release AAR, and then verifies an exact owned-file rollback.
+The agent smoke starts from missing namespace, implicit BuildConfig, legacy SDK
+setters, and `kotlinOptions`; one `upgrade --apply` repairs them, builds and
+inspects a real release AAR, then proves byte-exact rollback.
 
 ## Design and validation
 
@@ -320,6 +373,7 @@ assembles the release AAR, and then verifies an exact owned-file rollback.
 - [Consumer R8 fixture analysis](R8_Configuration_Analysis.md)
 - [CLI runtime decision](docs/adr/0001-cli-runtime.md)
 - [Bounded migration transaction decision](docs/adr/0003-bounded-migration-transactions.md)
+- [Agent-style upgrade orchestration decision](docs/adr/0004-agent-upgrade-orchestration.md)
 
 Source and release binaries are provided under the [Apache License 2.0](LICENSE).
 

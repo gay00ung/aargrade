@@ -98,6 +98,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       - name: Migrate Kotlin catalog fixture and build its AAR
         run: scripts/migration-smoke.sh
+      - name: Run agent-style repair, migration, verification, and rollback
+        run: scripts/upgrade-agent-smoke.sh
 
   public-example:
     runs-on: ubuntu-latest

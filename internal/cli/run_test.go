@@ -124,6 +124,49 @@ func TestMigrateRequiresTarget(t *testing.T) {
 	}
 }
 
+func TestUpgradeJSONPreview(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{
+		"upgrade",
+		"--project", fixturePath(t, "migrate-kotlin-catalog"),
+		"--target-agp", "9.2.0",
+		"--format", "json",
+	}, &stdout, &stderr, "test")
+	if exitCode != 0 {
+		t.Fatalf("preview exit code=%d stderr=%q", exitCode, stderr.String())
+	}
+	var result struct {
+		Verdict   string `json:"verdict"`
+		Applied   bool   `json:"applied"`
+		Migration struct {
+			Ready   bool  `json:"ready"`
+			Changes []any `json:"changes"`
+		} `json:"migration"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("upgrade JSON: %v\n%s", err, stdout.String())
+	}
+	if result.Verdict != "preview" || result.Applied || !result.Migration.Ready || len(result.Migration.Changes) == 0 {
+		t.Fatalf("upgrade preview = %#v", result)
+	}
+}
+
+func TestUpgradeRequiresTarget(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"upgrade", "--project", fixturePath(t, "migrate-kotlin-catalog")}, &stdout, &stderr, "test")
+	if exitCode != 2 || !bytes.Contains(stderr.Bytes(), []byte("--target-agp is required")) {
+		t.Fatalf("exit code=%d stdout=%q stderr=%q", exitCode, stdout.String(), stderr.String())
+	}
+}
+
+func TestMigrateAcceptRoutesToStateValidation(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"migrate", "accept", "--project", fixturePath(t, "migrate-kotlin-catalog")}, &stdout, &stderr, "test")
+	if exitCode != 2 || !bytes.Contains(stderr.Bytes(), []byte("no AARGrade migration state")) {
+		t.Fatalf("exit code=%d stdout=%q stderr=%q", exitCode, stdout.String(), stderr.String())
+	}
+}
+
 func fixturePath(t *testing.T, name string) string {
 	t.Helper()
 	path, err := filepath.Abs(filepath.Join("..", "..", "testdata", "projects", name))

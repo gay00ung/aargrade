@@ -226,7 +226,8 @@ func allowedMigrationStatePath(path string) bool {
 	case "settings.gradle", "settings.gradle.kts", "build.gradle", "build.gradle.kts", "gradle.properties", "gradle/libs.versions.toml", "gradle/wrapper/gradle-wrapper.properties":
 		return true
 	}
-	return strings.HasSuffix(path, "/build.gradle") || strings.HasSuffix(path, "/build.gradle.kts")
+	return strings.HasSuffix(path, "/build.gradle") || strings.HasSuffix(path, "/build.gradle.kts") ||
+		strings.HasSuffix(path, "/src/main/AndroidManifest.xml")
 }
 
 func sortAndUniqueStrings(values []string) []string {
