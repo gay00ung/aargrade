@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.25.x"
+          go-version: "1.25.13"
           cache: true
       - run: go test ./...
       - run: go vet ./...
@@ -48,7 +48,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.25.x"
+          go-version: "1.25.13"
           cache: true
       - name: Set up JDK 17 for Android tools
         uses: actions/setup-java@v5
@@ -79,7 +79,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.25.x"
+          go-version: "1.25.13"
           cache: true
       - name: Run the read-only user demo
         run: make demo
@@ -130,7 +130,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.25.x"
+          go-version: "1.25.13"
           cache: true
       - name: Set up JDK 17 for Android tools
         uses: actions/setup-java@v5

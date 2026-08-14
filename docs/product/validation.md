@@ -241,8 +241,9 @@ This proves protocol behavior, not broad external demand for the integration.
   reachable standard-library vulnerabilities fixed in later Go patch releases.
 - Re-running `govulncheck` with Go 1.26.5 reported zero vulnerabilities called
   by AARGrade and zero in imported packages. One required-module advisory was
-  unreachable from this code. CI repeats the reachable-vulnerability scan on
-  the current Go 1.25 patch line.
+  unreachable from this code. When new standard-library advisories identified
+  Go 1.25.12 as affected on 2026-08-14, CI was pinned to the fixed Go 1.25.13
+  release and repeats the reachable-vulnerability scan there.
 
 ## Unverified hypotheses
 
