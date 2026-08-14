@@ -13,13 +13,14 @@ project, plan the toolchain change, inspect the candidate AAR, and build that
 artifact in isolated old and current Java/Kotlin consumers.
 
 ```text
-diagnose → plan → build/compare AAR → build consumer matrix → report to people, CI, or MCP
+diagnose → plan → preview/apply bounded migration → build/compare AAR → build consumer matrix → report
 ```
 
-AARGrade does not rewrite an arbitrary Gradle project or claim universal
-compatibility. `plan` describes the work; `verify` and `matrix` test its result.
-Only `host` edits project files, and it is preview-only unless `--apply` is
-explicitly supplied.
+AARGrade does not guess how to rewrite arbitrary Gradle logic or claim universal
+compatibility. `migrate` edits only statically proven AGP declarations, Wrapper
+configuration, and simple AGP 9 Built-in Kotlin cases. It previews by default,
+requires `--apply`, records exact rollback state, and blocks kapt, legacy APIs,
+and other ambiguous structures with an explanation.
 
 ## Implemented commands
 
@@ -27,6 +28,7 @@ explicitly supplied.
 | --- | --- | --- |
 | `doctor` | Read-only project and AGP migration diagnosis | None |
 | `plan` | Ordered target-AGP, Gradle, and JDK migration plan | None |
+| `migrate` | Preview/apply/rollback supported AGP, Wrapper, and Built-in Kotlin edits | Only with `--apply` |
 | `verify` | Build/inspect an AAR and compare it with a baseline | May create normal Gradle build outputs |
 | `matrix` | Build isolated Java/Kotlin consumer applications | Evidence under `.aargrade/matrix` |
 | `host add/remove` | Add/remove an owned app model for Upgrade Assistant | Only with `--apply` |
@@ -47,9 +49,10 @@ cd aargrade
 make demo
 ```
 
-It runs `doctor`, creates an AGP 9.3 `plan`, and previews `host add` against the
-public [`examples/library-only`](examples/library-only/README.en.md) project.
-It does not change the example.
+It runs `doctor`, creates an AGP 9.3 `plan`, and previews both `migrate` and
+`host add` against the public
+[`examples/library-only`](examples/library-only/README.en.md) project. It does
+not change the example.
 
 ## Install
 
@@ -106,6 +109,42 @@ being guessed:
 ```bash
 aargrade plan --project . --target-agp 9.3.0
 ```
+
+Preview the bounded edits. This command does not write anything:
+
+```bash
+aargrade migrate --project . --target-agp 9.2.0
+```
+
+Apply only after reviewing every diff and blocker:
+
+```bash
+aargrade migrate --project . --target-agp 9.2.0 --apply
+```
+
+The current automatic surface covers literal Kotlin/Groovy AGP declarations,
+legacy `buildscript` classpaths, the default version catalog, the minimum
+compatible Gradle Wrapper URL plus official distribution checksum, standalone
+Kotlin Android plugin declarations for AGP 9 Built-in Kotlin, and obsolete AGP
+9 opt-out properties.
+
+It fails closed on missing namespaces, implicit custom BuildConfig fields,
+legacy Kotlin kapt unless migrated to `com.android.legacy-kapt`, KSP below
+2.3.6, Kotlin compiler/source-set DSL, legacy Variant/internal
+APIs, buildSrc, custom settings catalogs, RefreshVersions, dynamic convention
+plugins, and catalog version refs shared with non-AGP entries.
+
+An apply stores exact originals and before/after hashes under
+`.aargrade/state/migration.json`. Rollback proceeds only while every owned file
+still matches one of those hashes:
+
+```bash
+aargrade migrate rollback --project .         # preview
+aargrade migrate rollback --project . --apply # exact restore
+```
+
+Keep `.aargrade/` out of version control. The local state contains original
+Gradle configuration and should be handled as potentially sensitive.
 
 Compare the released baseline with a candidate AAR:
 
@@ -223,10 +262,11 @@ your client's documentation:
 }
 ```
 
-The server exposes `aargrade_doctor`, `aargrade_plan`, `aargrade_verify`,
-`aargrade_matrix`, `aargrade_host_add`, and `aargrade_host_remove` with inferred
-input/output schemas and structured results. Host `apply` and matrix
-`allowDownloads` both default to `false`.
+The server exposes `aargrade_doctor`, `aargrade_plan`, `aargrade_migrate`,
+`aargrade_migrate_rollback`, `aargrade_verify`, `aargrade_matrix`,
+`aargrade_host_add`, and `aargrade_host_remove` with inferred input/output
+schemas and structured results. Mutation `apply` and matrix `allowDownloads`
+default to `false`.
 
 ## CI and tests
 
@@ -252,6 +292,7 @@ Run the reproducible host lifecycle alone with:
 
 ```bash
 make test-upgrade-assistant-fixture
+make test-migration-smoke
 ```
 
 CI runs Go tests on Linux, macOS, and Windows, builds the public example AAR,
@@ -262,6 +303,10 @@ project or device runtime.
 A separate Gradle smoke matrix configures generated hosts on AGP 4.2.2, the
 AGP 7.4.2 Upgrade Assistant fixture, and AGP 9.2.0. The Android Studio UI result
 remains explicitly manual evidence rather than a headless-build substitute.
+
+The `migration-smoke` job migrates a real Kotlin/version-catalog fixture from
+AGP 8.8 to AGP 9.2/Gradle 9.4.1, compiles Kotlin through AGP's Built-in Kotlin,
+assembles the release AAR, and then verifies an exact owned-file rollback.
 
 ## Design and validation
 
@@ -274,6 +319,7 @@ remains explicitly manual evidence rather than a headless-build substitute.
 - [Upgrade Assistant A/B evidence (Korean)](docs/product/upgrade-assistant-experiment.ko.md)
 - [Consumer R8 fixture analysis](R8_Configuration_Analysis.md)
 - [CLI runtime decision](docs/adr/0001-cli-runtime.md)
+- [Bounded migration transaction decision](docs/adr/0003-bounded-migration-transactions.md)
 
 Source and release binaries are provided under the [Apache License 2.0](LICENSE).
 

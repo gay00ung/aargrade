@@ -1,6 +1,9 @@
 package toolchain
 
-import "testing"
+import (
+	"encoding/hex"
+	"testing"
+)
 
 func TestForAGP(t *testing.T) {
 	compatibility, err := ForAGP("9.3.1")
@@ -15,6 +18,34 @@ func TestForAGP(t *testing.T) {
 func TestForAGPRejectsUnknownLine(t *testing.T) {
 	if _, err := ForAGP("10.0.0"); err == nil {
 		t.Fatal("ForAGP accepted an unsupported line")
+	}
+}
+
+func TestGradleDistributionSHA256(t *testing.T) {
+	checksum, err := GradleDistributionSHA256("9.4.1", "bin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checksum != "2ab2958f2a1e51120c326cad6f385153bb11ee93b3c216c5fccebfdfbb7ec6cb" {
+		t.Fatalf("checksum = %q", checksum)
+	}
+	if _, err := GradleDistributionSHA256("9.4.1", "source"); err == nil {
+		t.Fatal("unknown distribution flavor should fail closed")
+	}
+}
+
+func TestEveryCompatibilityMinimumHasValidChecksums(t *testing.T) {
+	for line, compatibility := range compatibilityByLine {
+		for _, flavor := range []string{"bin", "all"} {
+			checksum, err := GradleDistributionSHA256(compatibility.MinimumGradle, flavor)
+			if err != nil {
+				t.Fatalf("AGP %s %s checksum: %v", line, flavor, err)
+			}
+			decoded, err := hex.DecodeString(checksum)
+			if err != nil || len(decoded) != 32 {
+				t.Fatalf("AGP %s Gradle %s %s checksum = %q", line, compatibility.MinimumGradle, flavor, checksum)
+			}
+		}
 	}
 }
 

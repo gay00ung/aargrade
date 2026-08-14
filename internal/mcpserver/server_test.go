@@ -10,6 +10,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/gay00ung/aargrade/internal/migration"
 	"github.com/gay00ung/aargrade/internal/model"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -47,6 +48,8 @@ func TestServerListsToolsAndRunsDoctor(t *testing.T) {
 		"aargrade_host_add",
 		"aargrade_host_remove",
 		"aargrade_matrix",
+		"aargrade_migrate",
+		"aargrade_migrate_rollback",
 		"aargrade_plan",
 		"aargrade_verify",
 	}
@@ -78,6 +81,32 @@ func TestServerListsToolsAndRunsDoctor(t *testing.T) {
 	}
 	if report.ToolVersion != "test" || report.ProjectRoot != project || len(report.Findings) == 0 {
 		t.Fatalf("unexpected doctor report: %#v", report)
+	}
+
+	migrationProject, err := filepath.Abs(filepath.Join("..", "..", "testdata", "projects", "migrate-kotlin-catalog"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	called, err = clientSession.CallTool(ctx, &mcp.CallToolParams{
+		Name:      "aargrade_migrate",
+		Arguments: MigrateInput{ProjectPath: migrationProject, TargetAGP: "9.2.0"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if called.IsError {
+		t.Fatalf("migrate preview returned a tool error: %v", called.GetError())
+	}
+	encoded, err = json.Marshal(called.StructuredContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var migrationResult migration.MutationResult
+	if err := json.Unmarshal(encoded, &migrationResult); err != nil {
+		t.Fatal(err)
+	}
+	if !migrationResult.Ready || migrationResult.Applied || len(migrationResult.Changes) == 0 {
+		t.Fatalf("unexpected migrate preview: %#v", migrationResult)
 	}
 }
 
@@ -124,9 +153,9 @@ func TestStdioServerNegotiatesAndListsTools(t *testing.T) {
 		_ = session.Close()
 		t.Fatal(err)
 	}
-	if len(listed.Tools) != 6 {
+	if len(listed.Tools) != 8 {
 		_ = session.Close()
-		t.Fatalf("stdio tool count = %d, want 6", len(listed.Tools))
+		t.Fatalf("stdio tool count = %d, want 8", len(listed.Tools))
 	}
 	if err := session.Close(); err != nil {
 		t.Fatal(err)

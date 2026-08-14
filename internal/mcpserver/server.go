@@ -32,6 +32,18 @@ type PlanInput struct {
 	CurrentAGP  string `json:"currentAgp,omitempty" jsonschema:"Verified current AGP override. Leave empty to discover it from the project."`
 }
 
+type MigrateInput struct {
+	ProjectPath string `json:"projectPath,omitempty" jsonschema:"Gradle project root. Defaults to the current directory."`
+	TargetAGP   string `json:"targetAgp" jsonschema:"Target Android Gradle Plugin version, for example 9.3.0."`
+	CurrentAGP  string `json:"currentAgp,omitempty" jsonschema:"Verified current AGP override. Leave empty to discover it from the project."`
+	Apply       bool   `json:"apply,omitempty" jsonschema:"Write the previewed bounded migration and local rollback state. Defaults to false."`
+}
+
+type MigrateRollbackInput struct {
+	ProjectPath string `json:"projectPath,omitempty" jsonschema:"Gradle project root. Defaults to the current directory."`
+	Apply       bool   `json:"apply,omitempty" jsonschema:"Restore unchanged migrated files and remove ownership state. Defaults to false."`
+}
+
 type VerifyInput struct {
 	ProjectPath    string   `json:"projectPath,omitempty" jsonschema:"Gradle project root used when candidateAar is omitted."`
 	LibraryPath    string   `json:"libraryPath,omitempty" jsonschema:"Android library Gradle path, for example :sdk."`
@@ -108,6 +120,35 @@ func New(version string) *mcp.Server {
 			ToolVersion:        version,
 		})
 		return nil, plan, err
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "aargrade_migrate",
+		Title:       "Preview or apply AGP migration",
+		Description: "Preview bounded AGP, Gradle Wrapper, and AGP 9 Built-in Kotlin edits. Set apply=true only after reviewing all changes and blockers.",
+		Annotations: destructiveAnnotations("Preview or apply AGP migration"),
+	}, func(_ context.Context, _ *mcp.CallToolRequest, input MigrateInput) (*mcp.CallToolResult, migration.MutationResult, error) {
+		result, err := migration.Migrate(migration.MutationOptions{
+			ProjectPath:        defaultString(input.ProjectPath, "."),
+			TargetAGP:          input.TargetAGP,
+			CurrentAGPOverride: input.CurrentAGP,
+			ToolVersion:        version,
+			Apply:              input.Apply,
+		})
+		return nil, result, err
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "aargrade_migrate_rollback",
+		Title:       "Preview or apply migration rollback",
+		Description: "Restore exact pre-migration Gradle files only while every owned file still matches its recorded before or after hash.",
+		Annotations: destructiveAnnotations("Preview or apply migration rollback"),
+	}, func(_ context.Context, _ *mcp.CallToolRequest, input MigrateRollbackInput) (*mcp.CallToolResult, migration.MutationResult, error) {
+		result, err := migration.Rollback(migration.RollbackOptions{
+			ProjectPath: defaultString(input.ProjectPath, "."),
+			Apply:       input.Apply,
+		})
+		return nil, result, err
 	})
 
 	mcp.AddTool(server, &mcp.Tool{

@@ -158,6 +158,31 @@ environment, checksums, logs, protocol, and bounded conclusion are in the
   requires Gradle 9.5.0 and JDK 17, while still requiring later artifact and
   consumer verification.
 
+### Bounded migration and rollback
+
+- `migrate` is read-only by default and produces deterministic per-file diffs,
+  before/after SHA-256 values, blockers, warnings, and required verification
+  steps. `--apply` rechecks every input hash before writing.
+- A Kotlin DSL fixture backed by `gradle/libs.versions.toml` was migrated from
+  AGP 8.8.0/Gradle 8.10.2 to AGP 9.2.0/Gradle 9.4.1. The engine updated the
+  catalog AGP ref, Wrapper URL, and official distribution checksum; removed two
+  standalone Kotlin Android plugin declarations and four obsolete AGP 9
+  opt-out properties.
+- With JDK 17 and Android platform 35, the migrated fixture passed real
+  `help`, `build --dry-run`, `compileReleaseKotlin`, and `assembleRelease` tasks.
+  The Kotlin source was therefore compiled through AGP 9 Built-in Kotlin and a
+  release AAR was produced.
+- `migrate rollback --apply` restored every owned configuration file byte for
+  byte and removed the transaction state. Unit and integration tests repeat
+  preview/apply/rollback and prove that a post-migration user edit blocks the
+  entire restore.
+- Negative fixtures prove fail-closed behavior for shared catalog refs, KSP
+  below 2.3.6, buildSrc, implicit BuildConfig, legacy Variant API, missing AGP
+  8+ namespace, and multiline Kotlin plugin declarations.
+- CI repeats the real migration/build/rollback lifecycle in the
+  `migration-smoke` job. Wrapper checksum transformation is covered for both
+  `bin` and `all` distributions without weakening an existing pin.
+
 ### AAR verification
 
 - The inspector accepts only regular non-symlink AARs, bounds archive and entry
@@ -220,15 +245,15 @@ fixture rather than a consumer regression.
 - The server uses the official Tier-1
   [Model Context Protocol Go SDK](https://modelcontextprotocol.io/docs/sdk),
   currently pinned to `github.com/modelcontextprotocol/go-sdk` v1.7.0.
-- Six tools call the same domain packages as the CLI: doctor, plan, verify,
-  matrix, host add, and host remove. There is no subprocess parsing or duplicate
-  policy engine.
+- Eight tools call the same domain packages as the CLI: doctor, plan, migrate,
+  migrate rollback, verify, matrix, host add, and host remove. There is no
+  subprocess parsing or duplicate policy engine.
 - Typed input/output schemas are inferred by the SDK. Read-only, additive,
   open-world, and destructive annotations reflect the operations; host apply
   and Gradle downloads remain explicit opt-ins.
 - Tests negotiate an in-memory session, list and call typed tools, verify that
   invalid input becomes a tool-visible error, and launch a separate real stdio
-  server process to negotiate and list all six tools.
+  server process to negotiate and list all eight tools.
 - Verification and matrix operations propagate MCP cancellation into Gradle,
   JDK, Gradle validation, and HTTP download contexts.
 
@@ -239,11 +264,11 @@ This proves protocol behavior, not broad external demand for the integration.
 - `go mod verify` passed for the pinned module graph.
 - `govulncheck` under the initially installed Go 1.26.0 correctly reported
   reachable standard-library vulnerabilities fixed in later Go patch releases.
-- Re-running `govulncheck` with Go 1.26.5 reported zero vulnerabilities called
-  by AARGrade and zero in imported packages. One required-module advisory was
-  unreachable from this code. When new standard-library advisories identified
-  Go 1.25.12 as affected on 2026-08-14, CI was pinned to the fixed Go 1.25.13
-  release and repeats the reachable-vulnerability scan there.
+- Re-running the scan with the CI/release toolchain Go 1.25.13 reported zero
+  vulnerabilities called by AARGrade. One imported/required-module advisory
+  was unreachable from this code. CI and release builds remain pinned to that
+  fixed patch and repeat the reachable-vulnerability scan; Go 1.26 builders
+  must use 1.26.6 or newer for the same fixes.
 
 ## Release automation evidence
 

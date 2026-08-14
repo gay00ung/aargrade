@@ -127,6 +127,48 @@ func TestUpgradeAssistantReproHostLifecycle(t *testing.T) {
 	assertDoctorFinding(t, root, "android.library-only")
 }
 
+func TestMigrationCLIUserJourney(t *testing.T) {
+	root := copyRepositoryTree(t, filepath.Join("testdata", "projects", "migrate-kotlin-catalog"))
+	originalBuild, err := os.ReadFile(filepath.Join(root, "sdk", "build.gradle.kts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	if exitCode := cli.Run([]string{"migrate", "--project", root, "--target-agp", "9.2.0"}, &stdout, &stderr, "test"); exitCode != 0 {
+		t.Fatalf("migrate preview exit code = %d; stderr=%s", exitCode, stderr.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte("PREVIEW — no files changed")) || !bytes.Contains(stdout.Bytes(), []byte("gradle-9.4.1-bin.zip")) {
+		t.Fatalf("unexpected migrate preview:\n%s", stdout.String())
+	}
+	assertFileContent(t, filepath.Join(root, "sdk", "build.gradle.kts"), originalBuild)
+
+	stdout.Reset()
+	stderr.Reset()
+	if exitCode := cli.Run([]string{"migrate", "--project", root, "--target-agp", "9.2.0", "--apply"}, &stdout, &stderr, "test"); exitCode != 0 {
+		t.Fatalf("migrate apply exit code = %d; stderr=%s", exitCode, stderr.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte("APPLIED")) {
+		t.Fatalf("migrate apply output missing status:\n%s", stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(root, ".aargrade", "state", "migration.json")); err != nil {
+		t.Fatalf("migration state missing: %v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if exitCode := cli.Run([]string{"migrate", "rollback", "--project", root, "--apply"}, &stdout, &stderr, "test"); exitCode != 0 {
+		t.Fatalf("migrate rollback exit code = %d; stderr=%s", exitCode, stderr.String())
+	}
+	if !bytes.Contains(stdout.Bytes(), []byte("APPLIED")) {
+		t.Fatalf("rollback output missing status:\n%s", stdout.String())
+	}
+	assertFileContent(t, filepath.Join(root, "sdk", "build.gradle.kts"), originalBuild)
+	if _, err := os.Stat(filepath.Join(root, ".aargrade", "state", "migration.json")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("migration state remains after CLI rollback: %v", err)
+	}
+}
+
 func TestVerifyJourneyWithExistingArtifacts(t *testing.T) {
 	aarPath := filepath.Join(t.TempDir(), "sdk.aar")
 	createMinimalAAR(t, aarPath)

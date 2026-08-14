@@ -81,6 +81,49 @@ func TestPlanJSON(t *testing.T) {
 	}
 }
 
+func TestMigrateJSONPreviewAndBlockedExitCodes(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{
+		"migrate",
+		"--project", fixturePath(t, "migrate-kotlin-catalog"),
+		"--target-agp", "9.2.0",
+		"--format", "json",
+	}, &stdout, &stderr, "test")
+	if exitCode != 0 {
+		t.Fatalf("preview exit code=%d stderr=%q", exitCode, stderr.String())
+	}
+	var result struct {
+		Ready   bool  `json:"ready"`
+		Applied bool  `json:"applied"`
+		Changes []any `json:"changes"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("migrate JSON: %v\n%s", err, stdout.String())
+	}
+	if !result.Ready || result.Applied || len(result.Changes) == 0 {
+		t.Fatalf("migrate preview = %#v", result)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	exitCode = Run([]string{
+		"migrate",
+		"--project", fixturePath(t, "groovy-mixed"),
+		"--target-agp", "9.2.0",
+	}, &stdout, &stderr, "test")
+	if exitCode != 1 || !bytes.Contains(stdout.Bytes(), []byte("BLOCKED")) {
+		t.Fatalf("blocked exit code=%d stdout=%q stderr=%q", exitCode, stdout.String(), stderr.String())
+	}
+}
+
+func TestMigrateRequiresTarget(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	exitCode := Run([]string{"migrate", "--project", fixturePath(t, "migrate-kotlin-catalog")}, &stdout, &stderr, "test")
+	if exitCode != 2 || !bytes.Contains(stderr.Bytes(), []byte("--target-agp is required")) {
+		t.Fatalf("exit code=%d stdout=%q stderr=%q", exitCode, stdout.String(), stderr.String())
+	}
+}
+
 func fixturePath(t *testing.T, name string) string {
 	t.Helper()
 	path, err := filepath.Abs(filepath.Join("..", "..", "testdata", "projects", name))

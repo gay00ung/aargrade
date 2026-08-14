@@ -7,6 +7,10 @@
 - Milestone 2 is implemented as a conservative first engine: version-aware
   planning, wrapper-driven build evidence, bounded AAR inspection, JVM linkage,
   metadata, Consumer R8, and JNI packaging comparison.
+- A preview-first migration engine is implemented for statically proven AGP,
+  version-catalog, Wrapper/checksum, and simple AGP 9 Built-in Kotlin changes.
+  It records a hash-owned transaction and supports exact rollback; ambiguous
+  DSL, kapt, old KSP, buildSrc, and legacy APIs fail closed.
 - Milestone 3 is implemented and Gate D passed locally: the public AAR built in
   AGP 4.2.2 and 9.2.0 Java/Kotlin consumers with explicit JDK 11/17. CI is
   configured to repeat all four cells.
@@ -68,6 +72,7 @@ detect, invoke, and consolidate those tools where their contracts are stable.
 | `doctor` | Read-only inventory and migration-risk findings | Implemented |
 | `host add/remove` | Reversible temporary application host with ownership proof | Implemented; controlled Upgrade Assistant workaround validated |
 | `plan --target-agp` | Version-aware migration plan, without source mutation | Implemented |
+| `migrate --target-agp` / `migrate rollback` | Bounded preview/apply and hash-owned exact restore | Implemented; AGP 8.8 Kotlin catalog fixture builds on AGP 9.2 |
 | `verify` | Candidate build, AAR/JVM linkage, metadata, R8, and JNI packaging evidence | Implemented with documented limits |
 | `matrix` | Real Java/Kotlin consumer builds across declared toolchains | Implemented; four endpoint cells proven |
 | `mcp serve` | Agent interface over the shared domain contract | Implemented |

@@ -26,6 +26,11 @@ run_aargrade plan \
   --project "${example_project}" \
   --target-agp 9.3.0
 
+printf '\nAARGrade public example: bounded migration preview\n\n'
+run_aargrade migrate \
+  --project "${example_project}" \
+  --target-agp 9.3.0
+
 printf '\nAARGrade public example: temporary-host preview\n\n'
 run_aargrade host add \
   --project "${example_project}"

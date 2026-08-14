@@ -21,15 +21,18 @@ AARGrade는 **Android 라이브러리와 SDK 제작자를 위한 AGP 마이그�
 ```text
 현재 프로젝트 진단
 → AGP 업그레이드 순서 확인
+→ 안전하게 증명 가능한 Gradle 선언 변경을 미리보기·적용
 → 기준 AAR과 후보 AAR의 구조·JVM 연결 호환성 비교
 → 구형/최신 Java·Kotlin 고객 앱에서 실제 빌드
 → 결과를 사람, CI, MCP 에이전트가 같은 형식으로 사용
 ```
 
-AARGrade가 AGP나 소스 코드를 마음대로 바꾸지는 않습니다. `plan`은 변경
-순서를 알려주고, `verify`와 `matrix`는 마이그레이션 결과를 검증합니다.
-파일을 직접 바꾸는 기능은 임시 앱을 관리하는 `host`뿐이며, 이것도 기본은
-미리보기이고 `--apply`를 명시해야 적용됩니다.
+AARGrade가 임의의 Gradle 코드를 추측해서 고치지는 않습니다. `migrate`는
+AGP 선언, Gradle Wrapper, 단순한 AGP 9 Built-in Kotlin 전환처럼 정적으로
+증명한 범위만 바꿉니다. 기본은 미리보기이며 `--apply`를 명시해야 적용되고,
+정확한 원본과 해시를 기록해 안전한 `rollback`을 제공합니다. kapt, 구형
+Variant API, 복잡한 Kotlin DSL처럼 판단이 필요한 항목은 이유와 함께
+차단합니다.
 
 ## 지금 실제로 되는 기능
 
@@ -37,6 +40,7 @@ AARGrade가 AGP나 소스 코드를 마음대로 바꾸지는 않습니다. `pla
 | --- | --- | --- |
 | `doctor` | 프로젝트 구조와 AGP 마이그레이션 위험 진단 | 없음 |
 | `plan` | 목표 AGP에 맞는 Gradle·JDK와 작업 순서 작성 | 없음 |
+| `migrate` | 지원하는 AGP·Wrapper·Built-in Kotlin 변경 미리보기/적용/롤백 | `--apply`를 쓴 경우만 |
 | `verify` | AAR 빌드/검사 및 기준 AAR과 정적 호환성 비교 | 소스는 안 바꾸지만 Gradle 빌드 결과 생성 가능 |
 | `matrix` | 격리된 Java·Kotlin 고객 앱을 만들어 실제 빌드 | `.aargrade/matrix` 아래에 증거 생성 |
 | `host add/remove` | 앱 model이 없을 때 Upgrade Assistant용 임시 앱을 안전하게 생성/제거 | `--apply`를 쓴 경우만 |
@@ -63,8 +67,9 @@ make demo
 
 1. `doctor`가 앱 없는 Android 라이브러리 프로젝트를 진단합니다.
 2. `plan`이 AGP 9.3 마이그레이션 순서를 만듭니다.
-3. `host add`가 만들 임시 앱과 Gradle 변경을 미리 보여줍니다.
-4. 실제 파일은 하나도 변경하지 않습니다.
+3. `migrate`가 AGP와 Wrapper 변경을 미리 보여줍니다.
+4. `host add`가 만들 임시 앱과 Gradle 변경을 미리 보여줍니다.
+5. 실제 파일은 하나도 변경하지 않습니다.
 
 ## 설치
 
@@ -154,7 +159,54 @@ aargrade plan --project . --target-agp 9.3.0
 알 수 없는 AGP 조합은 추측하지 않고 오류로 중단합니다. `plan`은 계획만
 만들며 Gradle 파일을 자동 수정하지 않습니다.
 
-### 3. 새 AAR 검증
+### 3. 지원 범위 안에서 실제 업그레이드
+
+먼저 변경될 줄을 확인합니다. 이 명령만으로는 파일을 바꾸지 않습니다.
+
+```bash
+aargrade migrate --project . --target-agp 9.2.0
+```
+
+출력된 변경과 차단 항목을 검토한 뒤 적용합니다.
+
+```bash
+aargrade migrate --project . --target-agp 9.2.0 --apply
+```
+
+현재 자동 변경 범위는 다음과 같습니다.
+
+- Kotlin/Groovy의 literal AGP plugin과 `buildscript` classpath
+- 기본 `gradle/libs.versions.toml`의 AGP version/ref
+- 목표 AGP가 요구하는 최소 Gradle Wrapper URL과 공식 SHA-256
+- 안전한 단일 줄 Kotlin Android plugin 제거와 AGP 9 Built-in Kotlin 전환
+- 완전 전환 뒤 불필요해진 `android.builtInKotlin`, `android.newDsl` 등
+
+다음 항목은 추측해서 바꾸지 않고 `BLOCKED`로 중단합니다.
+
+- namespace가 없거나 `BuildConfig` 기능을 명시해야 하는 프로젝트
+- 기존 Kotlin kapt(`com.android.legacy-kapt`로 검증된 경우 제외), KSP 2.3.6
+  미만, `kotlinOptions`, custom Kotlin source set
+- legacy Variant/internal API와 제거된 AGP 9 DSL
+- `buildSrc`, custom settings catalog, RefreshVersions, 동적 convention plugin
+- 다른 라이브러리와 AGP version ref를 공유하는 catalog
+
+적용 후에는 원본 내용과 적용 직후 SHA-256이
+`.aargrade/state/migration.json`에 로컬로 저장됩니다. 이후 파일을 사용자가
+수정하지 않은 경우에만 정확히 되돌릴 수 있습니다.
+
+```bash
+# 되돌릴 내용 확인
+aargrade migrate rollback --project .
+
+# 확인 후 원본 복원
+aargrade migrate rollback --project . --apply
+```
+
+상태 파일에는 원래 Gradle 설정 내용이 들어가므로 저장소에 커밋하지 말고
+민감한 로컬 자료처럼 취급하세요. AARGrade의 `.gitignore` 예시는
+`**/.aargrade/`를 제외합니다.
+
+### 4. 새 AAR 검증
 
 가장 신뢰도가 높은 사용법은 현재 배포 중인 기준 AAR과 새 후보 AAR을 함께
 주는 것입니다.
@@ -186,7 +238,7 @@ aargrade verify \
 기준 AAR을 주지 않으면 비교 항목은 `SKIPPED`로 표시되고 결과는
 `EVIDENCE`입니다. 건너뛴 검사를 성공으로 표시하지 않습니다.
 
-### 4. 고객 호환성 매트릭스 실행
+### 5. 고객 호환성 매트릭스 실행
 
 저장소 루트의 [`aargrade.yml`](aargrade.yml)은 실제로 사용하는 설정
 예제입니다.
@@ -246,7 +298,7 @@ SDK가 다른 라이브러리를 필요로 한다면 셀의 `dependencies`에 �
 AARGrade는 Gradle만 선택적으로 내려받습니다. JDK와 Android SDK platform은
 사용자가 로컬 또는 CI에 준비해야 합니다.
 
-### 5. 임시 앱 모듈이 정말 필요할 때
+### 6. 임시 앱 모듈이 정말 필요할 때
 
 앱 모듈이 없어서 Upgrade Assistant 문제가 발생한다는 현상을 먼저 재현한
 경우에만 사용합니다. 이 우회 방식은 2026-08-14의 통제 실험에서 실제로
@@ -274,7 +326,7 @@ AARGrade가 생성 당시 기록한 SHA-256과 소유 설정 블록이 그대로
 [`testdata/projects/upgrade-assistant-repro`](testdata/projects/upgrade-assistant-repro)와
 [한국어 실험 기록](docs/product/upgrade-assistant-experiment.ko.md)에 있습니다.
 
-### 6. MCP 에이전트에서 사용
+### 7. MCP 에이전트에서 사용
 
 MCP 클라이언트에는 다음 stdio 명령을 등록합니다.
 
@@ -297,10 +349,10 @@ aargrade mcp serve
 ```
 
 서버가 제공하는 도구는 `aargrade_doctor`, `aargrade_plan`,
-`aargrade_verify`, `aargrade_matrix`, `aargrade_host_add`,
-`aargrade_host_remove`입니다. 결과는 CLI와 같은 도메인 모델의 구조화된
-JSON입니다. `host`의 `apply`와 `matrix`의 `allowDownloads`는 MCP에서도
-기본값이 `false`입니다.
+`aargrade_migrate`, `aargrade_migrate_rollback`, `aargrade_verify`,
+`aargrade_matrix`, `aargrade_host_add`, `aargrade_host_remove`입니다. 결과는
+CLI와 같은 도메인 모델의 구조화된 JSON입니다. 모든 변경 도구의 `apply`와
+`matrix`의 `allowDownloads`는 MCP에서도 기본값이 `false`입니다.
 
 ## CI에서 사용
 
@@ -332,6 +384,7 @@ aargrade matrix \
 | --- | --- | --- | --- |
 | `doctor` | 기준 이상의 진단 없음 | `--fail-on` 기준 도달 | 분석/인자 오류 |
 | `plan` | 실행 가능한 계획 | 차단 항목 있음 | 정책/분석/인자 오류 |
+| `migrate` | 적용 가능한 미리보기/적용/롤백 | 안전하지 않아 차단 | 상태/정책/입력 오류 |
 | `verify` | 증거 생성 또는 호환 | 검증 실패 | 실행/입력 오류 |
 | `matrix` | 선택한 셀 통과 | 후보 실패 또는 회귀 | 미완료/환경/입력 오류 |
 
@@ -349,6 +402,7 @@ make example-verify # 예제 AAR 빌드 후 기준/후보 비교
 
 # Upgrade Assistant 재현 fixture의 host 전/후/복원 흐름만 빠르게 검사
 make test-upgrade-assistant-fixture
+make test-migration-smoke # AGP 8.8 → 9.2 적용, Kotlin/AAR 빌드, 원본 복원
 ```
 
 사용자 관점의 흐름은 [`tests/integration`](tests/integration)에 따로 두었고,
@@ -368,6 +422,10 @@ CI는 Linux, macOS, Windows에서 Go 테스트를 수행합니다. 또한 공개
 AGP 9.2.0에서 생성된 host가 실제로 구성되는지도 검사합니다. Android Studio
 UI A/B는 headless 빌드로 대체하지 않고 위 실험 기록으로 관리합니다.
 
+`migration-smoke` 작업은 version catalog와 Kotlin 소스가 있는 AGP 8.8
+fixture를 AGP 9.2/Gradle 9.4.1로 실제 변경하고, Built-in Kotlin 컴파일과
+release AAR 생성을 마친 뒤 모든 소유 설정이 byte 단위로 복원되는지 검사합니다.
+
 이 결과는 **설정한 네 환경의 빌드 증거**이지 모든 고객, 모든 API 호출,
 실기기 런타임을 보장한다는 뜻은 아닙니다.
 
@@ -382,6 +440,7 @@ UI A/B는 headless 빌드로 대체하지 않고 위 실험 기록으로 관리�
 - [Upgrade Assistant A/B evidence (English)](docs/product/upgrade-assistant-experiment.md)
 - [Consumer R8 테스트 설정 분석](R8_Configuration_Analysis.md)
 - [CLI 런타임 결정 기록](docs/adr/0001-cli-runtime.md)
+- [자동 마이그레이션·롤백 안전성 결정](docs/adr/0003-bounded-migration-transactions.md)
 
 소스와 릴리스 바이너리는 [Apache License 2.0](LICENSE)으로 배포합니다.
 

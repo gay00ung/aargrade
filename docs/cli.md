@@ -73,6 +73,92 @@ Exit codes:
 - `2`: invalid input, unsupported policy line, failed analysis, or output
   failure.
 
+## `migrate`
+
+```bash
+# Preview only
+aargrade migrate \
+  --project /path/to/project \
+  --target-agp 9.2.0
+
+# Apply the reviewed diff
+aargrade migrate \
+  --project /path/to/project \
+  --target-agp 9.2.0 \
+  --apply
+```
+
+Options:
+
+- `--project`: Gradle root. Default: `.`.
+- `--target-agp`: required target AGP version.
+- `--current-agp`: reviewed current version, accepted only when it does not
+  conflict with concrete declarations. An override cannot make an unresolved
+  mutation location safe.
+- `--apply`: write the exact previewed changes. Default: false.
+- `--format`: `text` or `json`.
+
+The bounded mutation engine currently supports:
+
+- literal Kotlin/Groovy `com.android.*` plugin versions;
+- `com.android.tools.build:gradle` classpath coordinates;
+- AGP entries and unshared `version.ref` keys in the default
+  `gradle/libs.versions.toml` catalog;
+- a below-minimum Gradle Wrapper URL and its pinned official `bin`/`all`
+  distribution SHA-256;
+- standalone Kotlin Android plugin declarations when moving to AGP 9 Built-in
+  Kotlin without compiler/source-set DSL; and
+- removal of obsolete full-migration properties including
+  `android.builtInKotlin` and `android.newDsl`.
+
+The operation fails closed before writing when static evidence finds an
+unresolved/conflicting AGP declaration, missing AGP 8+ namespace, implicit
+custom BuildConfig feature, legacy Kotlin kapt without `com.android.legacy-kapt`,
+KSP below 2.3.6, Kotlin compiler/source-set
+DSL, legacy Variant/internal APIs, removed AGP 9 DSL, mixed legacy KMP Android
+plugins, buildSrc, settings-defined catalogs, RefreshVersions, unresolved
+convention logic, or an AGP catalog version ref shared with unrelated entries.
+
+`--apply` re-reads every input hash, writes a prepared ownership transaction,
+atomically replaces each supported file, and marks the transaction applied.
+Exact original content, permissions, and before/after hashes are stored in the
+ignored local file `.aargrade/state/migration.json`. The state can contain
+original Gradle configuration and must be handled as potentially sensitive.
+
+The command does not install or select a JDK, regenerate Wrapper scripts/JAR,
+run Gradle, build an AAR, or claim compatibility. Its result always lists
+`./gradlew help`, `build --dry-run`, `verify`, and `matrix` as separate evidence
+steps.
+
+Exit codes:
+
+- `0`: a trustworthy applicable preview was produced, or it was applied.
+- `1`: a trustworthy analysis found a blocker; no files were written.
+- `2`: invalid input, unsupported policy/state, discovery, race, or output
+  failure.
+
+## `migrate rollback`
+
+```bash
+aargrade migrate rollback --project /path/to/project
+aargrade migrate rollback --project /path/to/project --apply
+```
+
+Options are `--project`, `--apply`, and `--format`. Preview is the default.
+Rollback first validates the strict state schema and limits owned paths to
+Gradle configuration files. Every current file must match either its recorded
+pre-migration hash or exact applied hash. Any other content means the user or a
+tool changed that file, so the entire rollback stops without restoring
+anything. Apply restores exact original bytes and modes, then removes the
+ownership state. A partially restored prepared transaction can be retried.
+
+Exit codes:
+
+- `0`: an applicable rollback preview was produced, or it was applied.
+- `1`: at least one owned file changed and automatic rollback was refused.
+- `2`: state is missing/invalid, an owned path is unsafe, or another
+  input/output failure prevented a trustworthy result.
+
 ## `verify`
 
 Inspect existing artifacts:
@@ -300,6 +386,8 @@ protocol traffic; operational failures go to stderr. It exposes:
 
 - `aargrade_doctor`
 - `aargrade_plan`
+- `aargrade_migrate`
+- `aargrade_migrate_rollback`
 - `aargrade_verify`
 - `aargrade_matrix`
 - `aargrade_host_add`
@@ -309,15 +397,16 @@ Each tool calls the same Go domain operation as the CLI and returns structured
 output with inferred input/output schemas. Long-running verification and matrix
 commands observe MCP request cancellation. Tool annotations distinguish
 read-only diagnosis/planning, additive build/evidence work, optional network
-access, and destructive host removal.
+access, and destructive migration/rollback/host operations.
 
-Host `apply` and matrix `allowDownloads` default to false in the MCP input
-schemas. Closing stdin ends the server session. Process exit code is `0` after a
-normal client disconnect and `2` when the server cannot run.
+All mutation `apply` values and matrix `allowDownloads` default to false in the
+MCP input schemas. Closing stdin ends the server session. Process exit code is
+`0` after a normal client disconnect and `2` when the server cannot run.
 
 ## JSON compatibility
 
-Doctor reports, migration plans, host plans, verification reports, and matrix
-reports currently use `schemaVersion: 1`. Within a schema version, new fields
-may be additive, but existing verdict semantics must not change. A breaking
-rename or semantic change requires a new schema version.
+Doctor reports, migration plans, mutation/rollback results, host plans,
+verification reports, and matrix reports currently use `schemaVersion: 1`.
+Within a schema version, new fields may be additive, but existing verdict
+semantics must not change. A breaking rename or semantic change requires a new
+schema version.
