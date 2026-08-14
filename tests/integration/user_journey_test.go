@@ -76,6 +76,57 @@ func TestPublicExampleUserJourney(t *testing.T) {
 	}
 }
 
+func TestUpgradeAssistantReproHostLifecycle(t *testing.T) {
+	root := copyRepositoryTree(t, filepath.Join("testdata", "projects", "upgrade-assistant-repro"))
+	settingsPath := filepath.Join(root, "settings.gradle.kts")
+	originalSettings, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, relative := range []string{
+		"gradlew",
+		"gradlew.bat",
+		filepath.Join("gradle", "wrapper", "gradle-wrapper.jar"),
+		filepath.Join("gradle", "wrapper", "gradle-wrapper.properties"),
+	} {
+		info, statErr := os.Stat(filepath.Join(root, relative))
+		if statErr != nil {
+			t.Fatalf("runnable fixture is missing %s: %v", relative, statErr)
+		}
+		if info.Size() == 0 {
+			t.Fatalf("runnable fixture contains an empty %s", relative)
+		}
+	}
+
+	assertDoctorFinding(t, root, "android.library-only")
+
+	var stdout, stderr bytes.Buffer
+	if exitCode := cli.Run([]string{"host", "add", "--project", root, "--apply"}, &stdout, &stderr, "test"); exitCode != 0 {
+		t.Fatalf("host add exit code = %d; stderr=%s", exitCode, stderr.String())
+	}
+	hostBuild, err := os.ReadFile(filepath.Join(root, ".aargrade", "upgrade-host", "build.gradle.kts"))
+	if err != nil {
+		t.Fatalf("read generated host build file: %v", err)
+	}
+	if !bytes.Contains(hostBuild, []byte(`id("com.android.application")`)) ||
+		!bytes.Contains(hostBuild, []byte(`implementation(project(":sdk"))`)) {
+		t.Fatalf("generated host is not an application consumer of :sdk:\n%s", hostBuild)
+	}
+	assertDoctorFinding(t, root, "android.application.present")
+
+	stdout.Reset()
+	stderr.Reset()
+	if exitCode := cli.Run([]string{"host", "remove", "--project", root, "--apply"}, &stdout, &stderr, "test"); exitCode != 0 {
+		t.Fatalf("host remove exit code = %d; stderr=%s", exitCode, stderr.String())
+	}
+	assertFileContent(t, settingsPath, originalSettings)
+	if _, err := os.Stat(filepath.Join(root, ".aargrade", "state", "upgrade-host.json")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("host state remains after removal: %v", err)
+	}
+	assertDoctorFinding(t, root, "android.library-only")
+}
+
 func TestVerifyJourneyWithExistingArtifacts(t *testing.T) {
 	aarPath := filepath.Join(t.TempDir(), "sdk.aar")
 	createMinimalAAR(t, aarPath)
@@ -97,7 +148,12 @@ func TestVerifyJourneyWithExistingArtifacts(t *testing.T) {
 
 func copyPublicExample(t *testing.T) string {
 	t.Helper()
-	source, err := filepath.Abs(filepath.Join("..", "..", "examples", "library-only"))
+	return copyRepositoryTree(t, filepath.Join("examples", "library-only"))
+}
+
+func copyRepositoryTree(t *testing.T, repositoryRelativePath string) string {
+	t.Helper()
+	source, err := filepath.Abs(filepath.Join("..", "..", repositoryRelativePath))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +168,7 @@ func copyPublicExample(t *testing.T) string {
 		}
 		target := filepath.Join(destination, relative)
 		if entry.IsDir() {
-			if relative != "." && (entry.Name() == ".gradle" || entry.Name() == ".aargrade" || entry.Name() == "build") {
+			if relative != "." && (entry.Name() == ".git" || entry.Name() == ".gradle" || entry.Name() == ".aargrade" || entry.Name() == "build") {
 				return filepath.SkipDir
 			}
 			return os.MkdirAll(target, 0o755)
@@ -124,11 +180,33 @@ func copyPublicExample(t *testing.T) string {
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(target, content, 0o644)
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(target, content, info.Mode().Perm())
 	}); err != nil {
-		t.Fatalf("copy public example: %v", err)
+		t.Fatalf("copy %s: %v", repositoryRelativePath, err)
 	}
 	return destination
+}
+
+func assertDoctorFinding(t *testing.T, root, findingID string) {
+	t.Helper()
+	var stdout, stderr bytes.Buffer
+	exitCode := cli.Run([]string{
+		"doctor",
+		"--project", root,
+		"--fail-on", "never",
+		"--format", "json",
+	}, &stdout, &stderr, "test")
+	if exitCode != 0 {
+		t.Fatalf("doctor exit code = %d; stderr=%s", exitCode, stderr.String())
+	}
+	want := []byte(`"id": "` + findingID + `"`)
+	if !bytes.Contains(stdout.Bytes(), want) {
+		t.Fatalf("doctor output does not contain %s:\n%s", findingID, stdout.String())
+	}
 }
 
 func createMinimalAAR(t *testing.T, path string) {

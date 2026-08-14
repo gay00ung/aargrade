@@ -1,6 +1,6 @@
 # Validation log
 
-Checked on **2026-08-13**. This document separates verified facts from product
+Checked through **2026-08-14**. This document separates verified facts from product
 hypotheses; it is not a claim that market demand has already been proven.
 
 ## Verified ecosystem facts
@@ -56,9 +56,11 @@ of two minimal library-only fixtures:
 | Groovy DSL legacy endpoint | AGP 4.2.2, Gradle 6.7.1, JDK 11, compileSdk 30 | `:aargrade-upgrade-host:tasks --all` succeeded; removal restored the original settings file. |
 | Kotlin DSL current endpoint | AGP 9.2.0, Gradle 9.4.1, JDK 17, compileSdk 35 | `:aargrade-upgrade-host:tasks --all` succeeded; removal restored the original settings file. |
 
-The reusable check is `scripts/gradle-smoke.sh`; CI runs both toolchain cells.
+The reusable check is `scripts/gradle-smoke.sh`; CI runs the legacy and current
+endpoints plus the dedicated Upgrade Assistant fixture.
 This proves that the generated Gradle models configure at the tested endpoints.
-It does **not** yet prove that the host changes Upgrade Assistant behavior.
+It does not by itself prove Android Studio behavior; that causal claim was
+tested separately in the controlled A/B experiment below.
 
 ### External repository trials
 
@@ -77,11 +79,21 @@ validation or proof of Upgrade Assistant failure.
 
 ### Upgrade Assistant A/B status
 
-The controlled protocol is documented in
-`docs/product/upgrade-assistant-experiment.md` with a dedicated AGP 7.4.2
-library-only fixture. An Android Studio UI run was attempted on 2026-08-13, but
-the macOS session was locked, so no UI actions were performed and no result was
-inferred. Gate A and Gate C remain open.
+Gate A and Gate C passed on 2026-08-14 in a controlled A→B→A run using Android
+Studio build `AI-253.30387.90.2532.14901460`, Microsoft OpenJDK 17.0.16, and the
+dedicated AGP 7.4.2/Gradle 7.5 library-only fixture.
+
+| State | Gradle/IDE observation | Upgrade Assistant observation |
+| --- | --- | --- |
+| A: library only | Wrapper `help` and Studio sync succeeded. | No usable plan; IDE log: `Unable to obtain application's Android Project`. |
+| B: after `host add --apply` | Sync succeeded and the generated application run configuration appeared. | Opened `Upgrade project from AGP 7.4.2`, selected 8.13.2, and listed concrete migration steps. |
+| A: after `host remove --apply` | Settings returned to its exact original SHA-256 and the host disappeared. | The open panel returned to `unknown AGP` / `Android Gradle Plugin not present`. |
+
+No migration step was run. This validates the workaround for that exact fixture
+and Studio build, not every future IDE or dynamic Gradle structure. The full
+environment, checksums, logs, protocol, and bounded conclusion are in the
+[experiment record](upgrade-assistant-experiment.md) and its
+[Korean version](upgrade-assistant-experiment.ko.md).
 
 ### Automated safety coverage
 
@@ -94,6 +106,10 @@ inferred. Gate A and Gate C remain open.
   creation.
 - Unix and Windows replacement paths compile; CI is configured to run unit
   tests on all three major desktop operating systems.
+- `TestUpgradeAssistantReproHostLifecycle` keeps the published fixture
+  runnable, verifies the library-only → application-present → library-only
+  diagnosis transition, and checks exact settings restoration. CI also adds
+  the AGP 7.4.2/Gradle 7.5/JDK 17 fixture to the real Gradle host smoke matrix.
 - The Consumer R8 negative fixture was reviewed separately: its global
   `-dontoptimize` option is a high-confidence `doctor` finding, while the
   remaining member rule requires source-level evidence and is not automatically
@@ -230,8 +246,8 @@ This proves protocol behavior, not broad external demand for the integration.
 
 ## Unverified hypotheses
 
-1. A library-only project currently causes Upgrade Assistant to miss an Android
-   model, and adding a minimal application host reliably fixes it.
+1. The validated host workaround remains reliable across other supported
+   Android Studio builds and real-world Gradle structures.
 2. SDK maintainers will adopt a new CLI instead of maintaining bespoke CI
    sample apps.
 3. The four-cell default matrix can be cheap and representative enough for

@@ -28,7 +28,7 @@ explicitly supplied.
 | `plan` | Ordered target-AGP, Gradle, and JDK migration plan | None |
 | `verify` | Build/inspect an AAR and compare it with a baseline | May create normal Gradle build outputs |
 | `matrix` | Build isolated Java/Kotlin consumer applications | Evidence under `.aargrade/matrix` |
-| `host add/remove` | Safely preview, add, or remove an owned temporary app | Only with `--apply` |
+| `host add/remove` | Add/remove an owned app model for Upgrade Assistant | Only with `--apply` |
 | `mcp serve` | Expose the same domain operations over MCP stdio | Depends on the called tool |
 
 The built-in verifier reads the public/protected JVM linkage surface. It does
@@ -151,7 +151,10 @@ best-effort basis, but retained build logs should still be treated as sensitive.
 ## Temporary Upgrade Assistant host
 
 Use this only after reproducing a problem caused by the lack of an application
-model:
+model. A controlled 2026-08-14 A→B→A experiment reproduced the missing
+application-project failure, opened a real AGP 7.4.2 → 8.13.2 plan after host
+addition, and restored the failure after removal. That validates the tested
+fixture and Studio build, not every IDE version.
 
 ```bash
 aargrade host add --project .            # preview
@@ -164,6 +167,9 @@ aargrade host remove --project . --apply # remove unchanged owned content
 
 Removal rechecks the owned settings block and every generated file SHA-256. It
 refuses modified or missing owned content and never deletes an existing app.
+The runnable fixture and full evidence are in
+[`testdata/projects/upgrade-assistant-repro`](testdata/projects/upgrade-assistant-repro)
+and the [experiment record](docs/product/upgrade-assistant-experiment.md).
 
 ## MCP
 
@@ -211,17 +217,28 @@ User-facing flows live in [`tests/integration`](tests/integration); focused Go
 unit tests are colocated with each `internal/*` package. Android-dependent
 consumer builds run in the CI `consumer-matrix` job.
 
+Run the reproducible host lifecycle alone with:
+
+```bash
+make test-upgrade-assistant-fixture
+```
+
 CI runs Go tests on Linux, macOS, and Windows, builds the public example AAR,
 then assembles it in four consumers: AGP 4.2.2/9.2.0 × Java/Kotlin with explicit
 Gradle and JDK provisioning. This proves the declared cells, not every customer
 project or device runtime.
+
+A separate Gradle smoke matrix configures generated hosts on AGP 4.2.2, the
+AGP 7.4.2 Upgrade Assistant fixture, and AGP 9.2.0. The Android Studio UI result
+remains explicitly manual evidence rather than a headless-build substitute.
 
 ## Design and validation
 
 - [CLI contract](docs/cli.md)
 - [Product and delivery plan](docs/product/plan.md)
 - [Validation evidence](docs/product/validation.md)
-- [Upgrade Assistant A/B protocol](docs/product/upgrade-assistant-experiment.md)
+- [Upgrade Assistant A/B evidence](docs/product/upgrade-assistant-experiment.md)
+- [Upgrade Assistant A/B evidence (Korean)](docs/product/upgrade-assistant-experiment.ko.md)
 - [Consumer R8 fixture analysis](R8_Configuration_Analysis.md)
 - [CLI runtime decision](docs/adr/0001-cli-runtime.md)
 

@@ -1,7 +1,7 @@
 GO ?= go
 GRADLE ?= ./examples/library-only/gradlew
 
-.PHONY: build test test-race vet vuln demo check example-build example-verify
+.PHONY: build test test-race test-upgrade-assistant-fixture vet vuln demo check example-build example-verify
 
 build:
 	mkdir -p bin
@@ -12,6 +12,9 @@ test:
 
 test-race:
 	$(GO) test -race ./...
+
+test-upgrade-assistant-fixture:
+	$(GO) test ./tests/integration -run '^TestUpgradeAssistantReproHostLifecycle$$' -v
 
 vet:
 	$(GO) vet ./...

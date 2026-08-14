@@ -234,6 +234,12 @@ tests when runtime behavior and a larger source surface matter.
 
 ## `host add`
 
+Use this workaround only after reproducing an Upgrade Assistant failure caused
+by the absence of an application Android model. The controlled AGP 7.4.2
+fixture changed from that exact failure to a usable migration plan after host
+addition; see the [bounded A/B evidence](product/upgrade-assistant-experiment.md).
+Other Studio versions or Gradle structures can still behave differently.
+
 ```bash
 # Preview
 aargrade host add --project /path/to/library

@@ -38,7 +38,7 @@ AARGrade가 AGP나 소스 코드를 마음대로 바꾸지는 않습니다. `pla
 | `plan` | 목표 AGP에 맞는 Gradle·JDK와 작업 순서 작성 | 없음 |
 | `verify` | AAR 빌드/검사 및 기준 AAR과 정적 호환성 비교 | 소스는 안 바꾸지만 Gradle 빌드 결과 생성 가능 |
 | `matrix` | 격리된 Java·Kotlin 고객 앱을 만들어 실제 빌드 | `.aargrade/matrix` 아래에 증거 생성 |
-| `host add/remove` | Upgrade Assistant 실험용 임시 앱을 안전하게 생성/제거 | `--apply`를 쓴 경우만 |
+| `host add/remove` | 앱 model이 없을 때 Upgrade Assistant용 임시 앱을 안전하게 생성/제거 | `--apply`를 쓴 경우만 |
 | `mcp serve` | 위 기능을 MCP 호환 에이전트에 제공 | 호출한 도구의 규칙을 따름 |
 
 `verify`의 내장 비교기는 JVM 클래스 파일의 public/protected 연결 표면을
@@ -216,7 +216,11 @@ AARGrade는 Gradle만 선택적으로 내려받습니다. JDK와 Android SDK pla
 ### 5. 임시 앱 모듈이 정말 필요할 때
 
 앱 모듈이 없어서 Upgrade Assistant 문제가 발생한다는 현상을 먼저 재현한
-경우에만 사용합니다.
+경우에만 사용합니다. 이 우회 방식은 2026-08-14의 통제 실험에서 실제로
+검증했습니다. 라이브러리 전용 상태에서는 Studio가 `application's Android
+Project`를 얻지 못했고, host 추가 후에는 AGP 7.4.2 → 8.13.2 계획이
+열렸으며, 제거 후 다시 실패 상태로 돌아갔습니다. 다른 Studio 버전에서도
+무조건 된다는 뜻은 아닙니다.
 
 ```bash
 # 변경 내용만 확인
@@ -233,6 +237,9 @@ aargrade host remove --project . --apply
 
 AARGrade가 생성 당시 기록한 SHA-256과 소유 설정 블록이 그대로일 때만
 제거합니다. 사용자가 수정한 파일이나 기존 앱은 삭제하지 않습니다.
+직접 확인할 수 있는 fixture와 전체 A/B 증거는
+[`testdata/projects/upgrade-assistant-repro`](testdata/projects/upgrade-assistant-repro)와
+[한국어 실험 기록](docs/product/upgrade-assistant-experiment.ko.md)에 있습니다.
 
 ### 6. MCP 에이전트에서 사용
 
@@ -305,6 +312,9 @@ make vuln       # 호출 가능한 Go 취약점 검사
 make check      # test + vet + 읽기 전용 데모
 make example-build
 make example-verify # 예제 AAR 빌드 후 기준/후보 비교
+
+# Upgrade Assistant 재현 fixture의 host 전/후/복원 흐름만 빠르게 검사
+make test-upgrade-assistant-fixture
 ```
 
 사용자 관점의 흐름은 [`tests/integration`](tests/integration)에 따로 두었고,
@@ -320,6 +330,10 @@ CI는 Linux, macOS, Windows에서 Go 테스트를 수행합니다. 또한 공개
 - AGP 9.2.0 + Gradle 9.4.1 + JDK 17 + Java
 - AGP 9.2.0 + Gradle 9.4.1 + JDK 17 + Built-in Kotlin
 
+별도의 Gradle smoke 작업은 AGP 4.2.2, Upgrade Assistant 재현용 AGP 7.4.2,
+AGP 9.2.0에서 생성된 host가 실제로 구성되는지도 검사합니다. Android Studio
+UI A/B는 headless 빌드로 대체하지 않고 위 실험 기록으로 관리합니다.
+
 이 결과는 **설정한 네 환경의 빌드 증거**이지 모든 고객, 모든 API 호출,
 실기기 런타임을 보장한다는 뜻은 아닙니다.
 
@@ -328,7 +342,8 @@ CI는 Linux, macOS, Windows에서 Go 테스트를 수행합니다. 또한 공개
 - [CLI 전체 명세](docs/cli.md)
 - [제품 및 개발 계획](docs/product/plan.md)
 - [검증 기록](docs/product/validation.md)
-- [Upgrade Assistant A/B 실험 절차](docs/product/upgrade-assistant-experiment.md)
+- [Upgrade Assistant A/B 실제 결과 (한국어)](docs/product/upgrade-assistant-experiment.ko.md)
+- [Upgrade Assistant A/B evidence (English)](docs/product/upgrade-assistant-experiment.md)
 - [Consumer R8 테스트 설정 분석](R8_Configuration_Analysis.md)
 - [CLI 런타임 결정 기록](docs/adr/0001-cli-runtime.md)
 

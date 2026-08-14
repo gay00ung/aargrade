@@ -1,6 +1,6 @@
 # AARGrade product and delivery plan
 
-## Implementation status (2026-08-13)
+## Implementation status (2026-08-14)
 
 - Milestone 1 is implemented: read-only diagnosis and ownership-safe host
   preview/apply/removal.
@@ -13,8 +13,13 @@
 - The MCP portion of Milestone 4 is implemented over the shared domain
   operations and tested through real stdio negotiation. A Gradle plugin is not
   implemented.
-- Upgrade Assistant UI Gates A and C and real external-user demand remain open.
-  Implementing the toolchain is not evidence that the market hypothesis is
+- Upgrade Assistant Gates A and C passed in a controlled A→B→A experiment:
+  Android Studio could not obtain an application project in the library-only
+  baseline, loaded an AGP 7.4.2 migration plan after `host add`, and returned
+  to the failure state after removal. Cross-version reliability and real
+  external-user demand remain open.
+- Gate B and Gate D passed as technical feasibility checks. Implementing and
+  exercising the toolchain is not evidence that the market hypothesis is
   already validated.
 
 ## Product contract
@@ -57,7 +62,7 @@ detect, invoke, and consolidate those tools where their contracts are stable.
 | Command | Outcome | Status |
 | --- | --- | --- |
 | `doctor` | Read-only inventory and migration-risk findings | Implemented |
-| `host add/remove` | Reversible temporary application host with ownership proof | Implemented |
+| `host add/remove` | Reversible temporary application host with ownership proof | Implemented; controlled Upgrade Assistant workaround validated |
 | `plan --target-agp` | Version-aware migration plan, without source mutation | Implemented |
 | `verify` | Candidate build, AAR/JVM linkage, metadata, R8, and JNI packaging evidence | Implemented with documented limits |
 | `matrix` | Real Java/Kotlin consumer builds across declared toolchains | Implemented; four endpoint cells proven |
@@ -156,12 +161,17 @@ Gradle plugin remains a future integration.
 
 ## Validation gates
 
-- **Gate A — problem reproduction:** publish a minimal library-only fixture and
-  record the exact Android Studio/Upgrade Assistant behavior and version.
-- **Gate B — diagnostic usefulness:** run against 3–5 external libraries;
-  classify every finding as useful, noisy, or missing.
-- **Gate C — host necessity:** keep `host` only if it changes a reproduced
-  failure into a usable Upgrade Assistant flow.
+- **Gate A — problem reproduction (passed in one controlled environment):** the
+  runnable AGP 7.4.2 library-only fixture synced successfully, while Android
+  Studio build `AI-253.30387.90.2532.14901460` logged `Unable to obtain
+  application's Android Project` and exposed no usable plan.
+- **Gate B — diagnostic usefulness (passed technically):** Timber, Picasso,
+  and Lottie trials classified useful, noisy, and unresolved findings and led
+  to concrete parser/diagnostic corrections. External adoption remains open.
+- **Gate C — host necessity (passed in the same environment):** `host add`
+  changed the reproduced failure into an AGP 7.4.2 → 8.13.2 plan; exact removal
+  restored settings and the failure state. See the
+  [A/B evidence](upgrade-assistant-experiment.md).
 - **Gate D — matrix feasibility (passed technically):** AGP 4.2.2/9.2.0 ×
   Java/Kotlin passed with Gradle 6.7.1/9.4.1 and JDK 11/17. This is not external
   adoption evidence.
@@ -171,8 +181,9 @@ Gradle plugin remains a future integration.
 
 ## Re-plan triggers
 
-- The library-only Upgrade Assistant failure cannot be reproduced on any
-  supported Android Studio version.
+- A future supported Android Studio version makes the host unnecessary, or a
+  repeated version matrix shows the workaround is not reliable enough to
+  document safely.
 - External-project trials show that lexical Gradle analysis is too noisy to
   produce trustworthy actions.
 - A consumer matrix requires redistribution or licensing terms incompatible
