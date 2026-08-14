@@ -9,6 +9,14 @@ import (
 	"testing"
 )
 
+func TestWindowsBatchCommandLineQuotesCommandAndArguments(t *testing.T) {
+	got := windowsBatchCommandLine(`C:\project with space\gradlew.bat`, "help", "argument with space")
+	want := `/d /s /c ""C:\project with space\gradlew.bat" "help" "argument with space""`
+	if got != want {
+		t.Fatalf("command line = %q, want %q", got, want)
+	}
+}
+
 func TestWindowsBatchLauncherWithSpaceInPath(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("Windows batch launcher coverage")

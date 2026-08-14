@@ -2,7 +2,6 @@ package process
 
 import (
 	"context"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -17,14 +16,28 @@ func CommandContext(ctx context.Context, executable string, args ...string) *exe
 	if runtime.GOOS == "windows" {
 		extension := strings.ToLower(filepath.Ext(executable))
 		if extension == ".bat" || extension == ".cmd" {
-			interpreter := os.Getenv("ComSpec")
-			if interpreter == "" {
-				interpreter = "cmd.exe"
-			}
-			commandArgs := []string{"/d", "/s", "/c", executable}
-			commandArgs = append(commandArgs, args...)
-			return exec.CommandContext(ctx, interpreter, commandArgs...)
+			return windowsBatchCommandContext(ctx, executable, args...)
 		}
 	}
 	return exec.CommandContext(ctx, executable, args...)
+}
+
+// windowsBatchCommandLine creates the canonical cmd.exe /s /c form:
+//
+//	/d /s /c ""C:\path with spaces\gradlew.bat" "help""
+//
+// The extra outer quote pair is required because cmd.exe parses the text after
+// /c as one command rather than with CommandLineToArgvW. The Windows-specific
+// launcher installs this string as SysProcAttr.CmdLine.
+func windowsBatchCommandLine(executable string, args ...string) string {
+	parts := make([]string, 0, len(args)+1)
+	parts = append(parts, quoteWindowsBatchToken(executable))
+	for _, arg := range args {
+		parts = append(parts, quoteWindowsBatchToken(arg))
+	}
+	return `/d /s /c "` + strings.Join(parts, " ") + `"`
+}
+
+func quoteWindowsBatchToken(value string) string {
+	return `"` + strings.ReplaceAll(value, `"`, `""`) + `"`
 }

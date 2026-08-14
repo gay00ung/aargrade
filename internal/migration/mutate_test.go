@@ -413,7 +413,7 @@ android {
 func TestMigrateAutoRepairRefusesNamespaceWithoutLiteralManifestPackage(t *testing.T) {
 	root := copyMigrationFixture(t, "migrate-kotlin-catalog")
 	buildPath := filepath.Join(root, "sdk", "build.gradle.kts")
-	build := strings.Replace(readMigrationTestFile(t, buildPath), `    namespace = "dev.aargrade.migratefixture"`+"\n", "", 1)
+	build := strings.Replace(readMigrationTestFile(t, buildPath), `    namespace = "dev.aargrade.migratefixture"`, "", 1)
 	if err := os.WriteFile(buildPath, []byte(build), 0o644); err != nil {
 		t.Fatal(err)
 	}
