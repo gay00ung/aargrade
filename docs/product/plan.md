@@ -27,8 +27,9 @@
   implemented.
 - Distribution automation is implemented: SemVer tags build six macOS, Linux,
   and Windows archives, verify their contents and embedded version, publish
-  SHA-256 checksums, and create a GitHub prerelease or stable release. The
-  release candidate is prepared for the explicit `v0.1.0-beta.1` tag.
+  SHA-256 checksums, and create a GitHub prerelease or stable release.
+  [`v0.1.0-beta.1`](https://github.com/gay00ung/aargrade/releases/tag/v0.1.0-beta.1)
+  is published as the first public beta.
 - Upgrade Assistant Gates A and C passed in a controlled A→B→A experiment:
   Android Studio could not obtain an application project in the library-only
   baseline, loaded an AGP 7.4.2 migration plan after `host add`, and returned

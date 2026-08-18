@@ -335,6 +335,13 @@ can continue the loop.
   repository access. Prerelease tags such as `v0.1.0-beta.1` are marked as
   GitHub prereleases, while tags such as `v0.1.0` create stable releases.
 - Publishing rejects a tag whose commit is not an ancestor of `origin/main`.
+- The `v0.1.0-beta.1` workflow passed its quality gate, built all six archives,
+  verified checksums and embedded versions, and published seven assets as a
+  GitHub prerelease on 2026-08-18.
+- A fresh download of the macOS arm64 archive matched `checksums.txt` and
+  executed as `aargrade v0.1.0-beta.1`. A separate temporary
+  `go install github.com/gay00ung/aargrade/cmd/aargrade@v0.1.0-beta.1` also
+  reported the same version.
 
 This validates the packaging and publication path. The GitHub Releases page
 and the tag-triggered workflow are the authoritative publication record.
