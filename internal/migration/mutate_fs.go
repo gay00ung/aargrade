@@ -248,22 +248,30 @@ func sortAndUniqueStrings(values []string) []string {
 func migrationDiff(before, after string) string {
 	left := splitPreviewLines(before)
 	right := splitPreviewLines(after)
+	const maxPreviewLines = 200
 	var output []string
 	for i, j := 0, 0; i < len(left) || j < len(right); {
 		switch {
 		case i < len(left) && j < len(right) && left[i] == right[j]:
 			i++
 			j++
-		case i+1 < len(left) && j < len(right) && left[i+1] == right[j]:
-			output = append(output, "- "+left[i])
-			i++
-		case i < len(left) && j+1 < len(right) && left[i] == right[j+1]:
-			output = append(output, "+ "+right[j])
-			j++
 		case i < len(left) && j < len(right):
-			output = append(output, "- "+left[i], "+ "+right[j])
-			i++
-			j++
+			leftOffset, rightOffset, found := previewResync(left, right, i, j)
+			if !found {
+				leftOffset, rightOffset = 1, 1
+			}
+			for leftOffset > 0 && rightOffset > 0 && left[i+leftOffset-1] == right[j+rightOffset-1] {
+				leftOffset--
+				rightOffset--
+			}
+			for _, line := range left[i : i+leftOffset] {
+				output = append(output, "- "+line)
+			}
+			for _, line := range right[j : j+rightOffset] {
+				output = append(output, "+ "+line)
+			}
+			i += leftOffset
+			j += rightOffset
 		case i < len(left):
 			output = append(output, "- "+left[i])
 			i++
@@ -271,13 +279,44 @@ func migrationDiff(before, after string) string {
 			output = append(output, "+ "+right[j])
 			j++
 		}
-	}
-	const maxPreviewLines = 200
-	if len(output) > maxPreviewLines {
-		omitted := len(output) - maxPreviewLines
-		output = append(output[:maxPreviewLines], fmt.Sprintf("… %d additional changed line(s) omitted", omitted))
+		if len(output) > maxPreviewLines {
+			output = append(output[:maxPreviewLines], "… additional changed lines omitted")
+			return strings.Join(output, "\n")
+		}
 	}
 	return strings.Join(output, "\n")
+}
+
+func previewResync(left, right []string, leftIndex, rightIndex int) (int, int, bool) {
+	const lookahead = 50
+	leftLimit := min(len(left)-leftIndex, lookahead)
+	rightLimit := min(len(right)-rightIndex, lookahead)
+	rightOffsets := make(map[string]int, rightLimit)
+	for offset := 0; offset < rightLimit; offset++ {
+		line := right[rightIndex+offset]
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if _, exists := rightOffsets[line]; !exists {
+			rightOffsets[line] = offset
+		}
+	}
+	bestLeft, bestRight, bestDistance := 0, 0, lookahead*2+1
+	for leftOffset := 0; leftOffset < leftLimit; leftOffset++ {
+		line := left[leftIndex+leftOffset]
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		rightOffset, ok := rightOffsets[line]
+		if !ok || leftOffset == 0 && rightOffset == 0 {
+			continue
+		}
+		distance := leftOffset + rightOffset
+		if distance < bestDistance {
+			bestLeft, bestRight, bestDistance = leftOffset, rightOffset, distance
+		}
+	}
+	return bestLeft, bestRight, bestDistance <= lookahead*2
 }
 
 func splitPreviewLines(content string) []string {

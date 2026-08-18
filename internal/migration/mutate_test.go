@@ -368,6 +368,45 @@ func TestTransformLegacySDKSettersPreservesCRLF(t *testing.T) {
 	}
 }
 
+func TestMigrationDiffResynchronizesAfterChangedBlock(t *testing.T) {
+	before := "plugins {\n    id(\"android\")\n    id(\"kotlin\")\n}\nandroid {\n    kotlinOptions {\n        jvmTarget = \"17\"\n    }\n    lint {\n        warningsAsErrors = true\n    }\n}\n"
+	after := "plugins {\n    id(\"android\")\n}\nandroid {\n    lint {\n        warningsAsErrors = true\n    }\n}\n\nkotlin {\n    compilerOptions {\n        jvmTarget = JvmTarget.fromTarget(\"17\")\n    }\n}\n"
+	diff := migrationDiff(before, after)
+	for _, unchanged := range []string{"android {", "    lint {", "        warningsAsErrors = true"} {
+		if strings.Contains(diff, "- "+unchanged) || strings.Contains(diff, "+ "+unchanged) {
+			t.Fatalf("unchanged line rendered as changed: %q\n%s", unchanged, diff)
+		}
+	}
+	for _, changed := range []string{"-     id(\"kotlin\")", "-     kotlinOptions {", "+ kotlin {"} {
+		if !strings.Contains(diff, changed) {
+			t.Fatalf("missing %q:\n%s", changed, diff)
+		}
+	}
+}
+
+func TestTransformLegacySDKSettersAcceptsVersionCatalogProviders(t *testing.T) {
+	before := `android {
+    compileSdkVersion libs.versions.compileSdk.get() as int
+    defaultConfig {
+        minSdkVersion libs.versions.minSdk.get() as int
+    }
+}
+`
+	after, count := transformLegacySDKSetters(before)
+	if count != 2 || !strings.Contains(after, "compileSdk = libs.versions.compileSdk.get() as int") ||
+		!strings.Contains(after, "minSdk = libs.versions.minSdk.get() as int") {
+		t.Fatalf("count=%d after=\n%s", count, after)
+	}
+}
+
+func TestTransformLegacySDKSettersRefusesArbitraryExpressions(t *testing.T) {
+	before := "android {\n    compileSdkVersion resolveSdk()\n}\n"
+	after, count := transformLegacySDKSetters(before)
+	if count != 0 || after != before {
+		t.Fatalf("unsafe expression changed: count=%d after=%q", count, after)
+	}
+}
+
 func TestEnsureJavaCompileTargetRefusesExistingTarget(t *testing.T) {
 	content := `android {
     compileOptions {
@@ -392,6 +431,43 @@ func TestEnsureJavaCompileTargetAcceptsMatchingExistingTargets(t *testing.T) {
 	updated, changed, err := ensureJavaCompileTarget(content, "17")
 	if err != nil || changed || updated != content {
 		t.Fatalf("matching targets should remain unchanged: changed=%v err=%v\n%s", changed, err, updated)
+	}
+}
+
+func TestMigrateKotlinOptionsAcceptsMatchingVersionCatalogProvider(t *testing.T) {
+	content := `android {
+    compileOptions {
+        sourceCompatibility libs.versions.javaTarget.get()
+        targetCompatibility libs.versions.javaTarget.get()
+    }
+    kotlinOptions {
+        jvmTarget = libs.versions.javaTarget.get()
+    }
+}
+`
+	updated, target, ok := migrateSimpleKotlinOptions(content)
+	if !ok || target != "libs.versions.javaTarget.get()" {
+		t.Fatalf("migration result: ok=%v target=%q\n%s", ok, target, updated)
+	}
+	aligned, changed, err := ensureJavaCompileTarget(updated, target)
+	if err != nil || changed {
+		t.Fatalf("matching provider should remain aligned: changed=%v err=%v\n%s", changed, err, aligned)
+	}
+	if strings.Contains(aligned, "kotlinOptions") || !strings.Contains(aligned, "JvmTarget.fromTarget(libs.versions.javaTarget.get())") {
+		t.Fatalf("provider migration is incomplete:\n%s", aligned)
+	}
+}
+
+func TestEnsureJavaCompileTargetRefusesDifferentVersionCatalogProvider(t *testing.T) {
+	content := `android {
+    compileOptions {
+        sourceCompatibility libs.versions.javaTarget.get()
+        targetCompatibility libs.versions.javaTarget.get()
+    }
+}
+`
+	if _, _, err := ensureJavaCompileTarget(content, "libs.versions.kotlinTarget.get()"); err == nil || !strings.Contains(err.Error(), "conflicts") {
+		t.Fatalf("different provider should require review: %v", err)
 	}
 }
 
@@ -426,10 +502,58 @@ func TestMigrateAutoRepairRefusesNamespaceWithoutLiteralManifestPackage(t *testi
 	}
 }
 
+func TestMigrateBetweenAGP9MinorsPreservesExistingKotlinSetup(t *testing.T) {
+	root := copyMigrationFixture(t, "migrate-kotlin-catalog")
+	catalogPath := filepath.Join(root, "gradle", "libs.versions.toml")
+	catalog := strings.Replace(readMigrationTestFile(t, catalogPath), `agp = "8.8.0"`, `agp = "9.2.0"`, 1)
+	if err := os.WriteFile(catalogPath, []byte(catalog), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := Migrate(MutationOptions{
+		ProjectPath: root,
+		TargetAGP:   "9.3.1",
+		AutoRepair:  true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Ready || len(result.Blockers) != 0 {
+		t.Fatalf("AGP 9 minor migration should be ready: %#v", result)
+	}
+	for _, change := range result.Changes {
+		if change.Path == "gradle.properties" || change.Path == "build.gradle.kts" || change.Path == "sdk/build.gradle.kts" {
+			t.Fatalf("AGP 9 minor migration changed existing Kotlin setup: %s\n%s", change.Path, change.Preview)
+		}
+		if change.Path == "gradle/libs.versions.toml" && !strings.Contains(string(change.after), "kotlin-android") {
+			t.Fatalf("AGP 9 minor migration removed Kotlin catalog declaration:\n%s", change.after)
+		}
+	}
+}
+
 func TestKotlinPluginMultilineDeclarationIsNotRemoved(t *testing.T) {
 	content := "plugins {\n    id(\"org.jetbrains.kotlin.android\")\n        version \"2.1.0\"\n}\n"
 	updated, removed, unsafe := removeKotlinAndroidPluginLines(content, nil)
 	if updated != content || removed != 0 || !reflect.DeepEqual(unsafe, []int{2}) {
+		t.Fatalf("updated=%q removed=%d unsafe=%v", updated, removed, unsafe)
+	}
+}
+
+func TestKotlinPluginGroovyApplyLinesAreRemovedIndependently(t *testing.T) {
+	content := "apply plugin: 'com.android.library'\n" +
+		"apply plugin: 'org.jetbrains.kotlin.android'\n" +
+		"apply plugin: 'com.vanniktech.maven.publish'\n"
+	updated, removed, unsafe := removeKotlinAndroidPluginLines(content, nil)
+	if removed != 1 || len(unsafe) != 0 || strings.Contains(updated, "org.jetbrains.kotlin.android") ||
+		!strings.Contains(updated, "com.android.library") || !strings.Contains(updated, "com.vanniktech.maven.publish") {
+		t.Fatalf("updated=%q removed=%d unsafe=%v", updated, removed, unsafe)
+	}
+}
+
+func TestKotlinPluginCallbackIsNotTreatedAsADeclaration(t *testing.T) {
+	content := `pluginManager.withPlugin("org.jetbrains.kotlin.android") { configureKotlin() }` + "\n"
+	updated, removed, unsafe := removeKotlinAndroidPluginLines(content, nil)
+	if updated != content || removed != 0 || len(unsafe) != 0 {
 		t.Fatalf("updated=%q removed=%d unsafe=%v", updated, removed, unsafe)
 	}
 }

@@ -22,6 +22,8 @@ var (
 	catalogVersionPattern             = regexp.MustCompile(`^\s*([A-Za-z0-9_.-]+)\s*=\s*["']([^"']+)["']\s*$`)
 	catalogIDPattern                  = regexp.MustCompile(`\bid\s*=\s*["']([^"']+)["']`)
 	catalogModulePattern              = regexp.MustCompile(`\bmodule\s*=\s*["']([^"']+)["']`)
+	catalogGroupPattern               = regexp.MustCompile(`\bgroup\s*=\s*["']([^"']+)["']`)
+	catalogNamePattern                = regexp.MustCompile(`\bname\s*=\s*["']([^"']+)["']`)
 	catalogInlineVersionPattern       = regexp.MustCompile(`\bversion\s*=\s*["']([^"']+)["']`)
 	catalogVersionRefPattern          = regexp.MustCompile(`\bversion\.ref\s*=\s*["']([^"']+)["']`)
 	catalogCoordinatePattern          = regexp.MustCompile(`^\s*[A-Za-z0-9_.-]+\s*=\s*["']([^"']+)["']\s*$`)
@@ -31,6 +33,8 @@ var (
 	kaptCallPattern                   = regexp.MustCompile(`\bkotlin\s*\(\s*["']kapt["']\s*\)`)
 	kaptDependencyPattern             = regexp.MustCompile(`\bkapt(?:Test|AndroidTest)?\s*\(`)
 	legacyKaptIDPattern               = regexp.MustCompile(`com\.android\.legacy-kapt`)
+	applyFalseContinuationPattern     = regexp.MustCompile(`^apply\s*(?:\(\s*)?false\b`)
+	pluginDeclarationStartPattern     = regexp.MustCompile(`^(?:id\b|kotlin\s*\(|apply\b|alias\s*\()`)
 	kspLiteralCallPattern             = regexp.MustCompile(`(?s)\bid\s*\(\s*["']com\.google\.devtools\.ksp["']\s*\)\s*version\s*["']([^"']+)["']`)
 	kspLiteralGroovyPattern           = regexp.MustCompile(`(?m)\bid\s+["']com\.google\.devtools\.ksp["']\s+version\s+["']([^"']+)["']`)
 	kspIDPattern                      = regexp.MustCompile(`com\.google\.devtools\.ksp`)
@@ -175,6 +179,8 @@ func parseCatalog(content string) catalogModel {
 			}
 		} else if match := catalogModulePattern.FindStringSubmatch(parts[1]); len(match) > 0 {
 			entry.module = match[1]
+		} else if groupMatch, nameMatch := catalogGroupPattern.FindStringSubmatch(parts[1]), catalogNamePattern.FindStringSubmatch(parts[1]); len(groupMatch) > 0 && len(nameMatch) > 0 {
+			entry.module = groupMatch[1] + ":" + nameMatch[1]
 		} else if match := catalogCoordinatePattern.FindStringSubmatch(code); len(match) > 0 {
 			segments := strings.Split(match[1], ":")
 			if len(segments) >= 2 {
@@ -367,7 +373,7 @@ func removeKotlinAndroidPluginLines(content string, aliases []string) (string, i
 			if cleanLines[next] == "" {
 				continue
 			}
-			continuation = strings.HasPrefix(cleanLines[next], "version ") || strings.HasPrefix(cleanLines[next], "apply ")
+			continuation = strings.HasPrefix(cleanLines[next], "version ") || applyFalseContinuationPattern.MatchString(cleanLines[next])
 			break
 		}
 		if isStandaloneKotlinAndroidPlugin(clean, aliases) && !continuation {
@@ -406,6 +412,10 @@ func removeKotlinAndroidCatalogEntries(content string) (string, int) {
 }
 
 func containsKotlinAndroidPlugin(line string, aliases []string) bool {
+	trimmed := strings.TrimSpace(line)
+	if !pluginDeclarationStartPattern.MatchString(trimmed) {
+		return false
+	}
 	if kotlinAndroidIDPattern.MatchString(line) || kotlinAndroidCallPattern.MatchString(line) {
 		return true
 	}

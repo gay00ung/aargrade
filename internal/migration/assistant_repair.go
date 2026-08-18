@@ -17,11 +17,16 @@ const maxManifestSize = 4 << 20
 
 var (
 	androidNamespaceValuePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$`)
-	legacySDKLinePattern         = regexp.MustCompile(`^(\s*)(compileSdkVersion|minSdkVersion|targetSdkVersion)\s*(?:\(\s*([0-9]+)\s*\)|=\s*([0-9]+)|\s+([0-9]+))\s*;?\s*$`)
+	legacySDKLinePattern         = regexp.MustCompile(`^(\s*)(compileSdkVersion|minSdkVersion|targetSdkVersion)\b(.*)$`)
+	integerLiteralPattern        = regexp.MustCompile(`^[0-9]+$`)
+	catalogProviderPattern       = regexp.MustCompile(`^libs\.versions(?:\.[A-Za-z_][A-Za-z0-9_]*)+\.get\(\)$`)
 	simpleJVMTargetPattern       = regexp.MustCompile(`^jvmTarget\s*(?:=\s*|\s+)["']([0-9]+(?:\.[0-9]+)?)["']\s*;?$`)
+	simpleJVMProviderPattern     = regexp.MustCompile(`^jvmTarget\s*(?:=\s*|\s+)(libs\.versions(?:\.[A-Za-z_][A-Za-z0-9_]*)+\.get\(\))\s*;?$`)
 	compilerOptionsPattern       = regexp.MustCompile(`\bcompilerOptions\s*\{`)
 	javaSourceTargetPattern      = regexp.MustCompile(`\b(sourceCompatibility|targetCompatibility)\b`)
 	javaTargetLinePattern        = regexp.MustCompile(`^\s*(sourceCompatibility|targetCompatibility)\s*(?:=\s*|\s+)(?:JavaVersion\.VERSION_([0-9_]+)|JavaVersion\.toVersion\(\s*["']?([0-9]+(?:\.[0-9]+)?)["']?\s*\)|["']([0-9]+(?:\.[0-9]+)?)["'])\s*;?\s*$`)
+	javaProviderTargetPattern    = regexp.MustCompile(`^\s*(sourceCompatibility|targetCompatibility)\s*(?:=\s*|\s+)(libs\.versions(?:\.[A-Za-z_][A-Za-z0-9_]*)+\.get\(\))\s*;?\s*$`)
+	javaProviderToVersionPattern = regexp.MustCompile(`^\s*(sourceCompatibility|targetCompatibility)\s*(?:=\s*|\s+)JavaVersion\.toVersion\(\s*(libs\.versions(?:\.[A-Za-z_][A-Za-z0-9_]*)+\.get\(\))\s*\)\s*;?\s*$`)
 )
 
 type scriptBlock struct {
@@ -41,7 +46,7 @@ type manifestNamespaceEvidence struct {
 	packageEnd   int
 }
 
-func applyAssistantRepairs(discovered *project.Project, targetMajor int, files []migrationFile, contents map[string]string, filesByRelative map[string]migrationFile, result *MutationResult) {
+func applyAssistantRepairs(discovered *project.Project, targetMajor int, crossesIntoAGP9 bool, files []migrationFile, contents map[string]string, filesByRelative map[string]migrationFile, result *MutationResult) {
 	if targetMajor >= 8 {
 		for _, module := range discovered.Modules {
 			if module.BuildFile == "" || module.HasPlugin("com.android.kotlin.multiplatform.library") {
@@ -107,7 +112,7 @@ func applyAssistantRepairs(discovered *project.Project, targetMajor int, files [
 		}
 	}
 
-	if targetMajor < 9 {
+	if !crossesIntoAGP9 {
 		return
 	}
 	for _, file := range files {
@@ -141,7 +146,7 @@ func applyAssistantRepairs(discovered *project.Project, targetMajor int, files [
 	}
 }
 
-func assistantRepairBlockers(discovered *project.Project, targetMajor int, files []migrationFile, contents map[string]string) []string {
+func assistantRepairBlockers(discovered *project.Project, targetMajor int, crossesIntoAGP9 bool, files []migrationFile, contents map[string]string) []string {
 	var blockers []string
 	if targetMajor >= 8 {
 		for _, module := range discovered.Modules {
@@ -167,7 +172,7 @@ func assistantRepairBlockers(discovered *project.Project, targetMajor int, files
 			}
 		}
 	}
-	if targetMajor >= 9 {
+	if crossesIntoAGP9 {
 		for _, file := range files {
 			updatedFile := file
 			updatedFile.content = contents[file.relative]
@@ -350,12 +355,9 @@ func transformLegacySDKSetters(content string) (string, int) {
 		if statement <= androidBlock.open || statement >= androidBlock.close {
 			continue
 		}
-		value := match[3]
-		if value == "" {
-			value = match[4]
-		}
-		if value == "" {
-			value = match[5]
+		value, ok := safeLegacySDKValue(match[3])
+		if !ok {
+			continue
 		}
 		property := map[string]string{
 			"compileSdkVersion": "compileSdk",
@@ -366,6 +368,24 @@ func transformLegacySDKSetters(content string) (string, int) {
 		count++
 	}
 	return strings.Join(parts, ""), count
+}
+
+func safeLegacySDKValue(raw string) (string, bool) {
+	value := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(raw), ";"))
+	if strings.HasPrefix(value, "=") {
+		value = strings.TrimSpace(strings.TrimPrefix(value, "="))
+	}
+	if strings.HasPrefix(value, "(") && strings.HasSuffix(value, ")") {
+		value = strings.TrimSpace(value[1 : len(value)-1])
+	}
+	if integerLiteralPattern.MatchString(value) {
+		return value, true
+	}
+	provider := strings.TrimSpace(strings.TrimSuffix(value, " as int"))
+	if catalogProviderPattern.MatchString(provider) {
+		return value, true
+	}
+	return "", false
 }
 
 func ensureJavaCompileTarget(content, target string) (string, bool, error) {
@@ -383,9 +403,14 @@ func ensureJavaCompileTarget(content, target string) (string, bool, error) {
 	if len(compileBlocks) > 1 {
 		return content, false, fmt.Errorf("multiple android.compileOptions blocks make Java/Kotlin target alignment ambiguous")
 	}
+	providerTarget := catalogProviderPattern.MatchString(target)
+	targetArgument := `"` + target + `"`
+	if providerTarget {
+		targetArgument = target
+	}
 	lines := []string{
-		`sourceCompatibility = JavaVersion.toVersion("` + target + `")`,
-		`targetCompatibility = JavaVersion.toVersion("` + target + `")`,
+		`sourceCompatibility = JavaVersion.toVersion(` + targetArgument + `)`,
+		`targetCompatibility = JavaVersion.toVersion(` + targetArgument + `)`,
 	}
 	if len(compileBlocks) == 0 {
 		updated, ok := insertIntoBlock(content, androidBlock, compileOptionsLines(lines))
@@ -401,26 +426,15 @@ func ensureJavaCompileTarget(content, target string) (string, bool, error) {
 		if !javaSourceTargetPattern.MatchString(line) {
 			continue
 		}
-		match := javaTargetLinePattern.FindStringSubmatch(line)
-		if len(match) == 0 {
+		property, value, ok := javaCompileTarget(line, providerTarget)
+		if !ok {
 			return content, false, fmt.Errorf("existing Java sourceCompatibility/targetCompatibility must be reviewed before aligning Kotlin jvmTarget %q", target)
 		}
-		property := match[1]
 		if found[property] {
 			return content, false, fmt.Errorf("duplicate %s declarations make Java/Kotlin target alignment ambiguous", property)
 		}
 		found[property] = true
-		value := match[2]
-		if value != "" {
-			value = strings.ReplaceAll(value, "_", ".")
-		}
-		if value == "" {
-			value = match[3]
-		}
-		if value == "" {
-			value = match[4]
-		}
-		if canonicalJavaTarget(value) != canonicalJavaTarget(target) {
+		if (providerTarget && value != target) || (!providerTarget && canonicalJavaTarget(value) != canonicalJavaTarget(target)) {
 			return content, false, fmt.Errorf("existing Java %s %q conflicts with Kotlin jvmTarget %q", property, value, target)
 		}
 	}
@@ -439,6 +453,32 @@ func ensureJavaCompileTarget(content, target string) (string, bool, error) {
 		return content, false, fmt.Errorf("cannot update android.compileOptions safely")
 	}
 	return updated, true, nil
+}
+
+func javaCompileTarget(line string, providerTarget bool) (string, string, bool) {
+	if providerTarget {
+		for _, pattern := range []*regexp.Regexp{javaProviderTargetPattern, javaProviderToVersionPattern} {
+			if match := pattern.FindStringSubmatch(line); len(match) > 0 {
+				return match[1], match[2], true
+			}
+		}
+		return "", "", false
+	}
+	match := javaTargetLinePattern.FindStringSubmatch(line)
+	if len(match) == 0 {
+		return "", "", false
+	}
+	value := match[2]
+	if value != "" {
+		value = strings.ReplaceAll(value, "_", ".")
+	}
+	if value == "" {
+		value = match[3]
+	}
+	if value == "" {
+		value = match[4]
+	}
+	return match[1], value, true
 }
 
 func canonicalJavaTarget(value string) string {
@@ -477,8 +517,16 @@ func migrateSimpleKotlinOptions(content string) (string, string, bool) {
 	if project.StripComments(body) != body {
 		return content, "", false
 	}
-	match := simpleJVMTargetPattern.FindStringSubmatch(strings.TrimSpace(body))
-	if len(match) == 0 {
+	bodyStatement := strings.TrimSpace(body)
+	target := ""
+	targetArgument := ""
+	if match := simpleJVMTargetPattern.FindStringSubmatch(bodyStatement); len(match) > 0 {
+		target = match[1]
+		targetArgument = `"` + target + `"`
+	} else if match := simpleJVMProviderPattern.FindStringSubmatch(bodyStatement); len(match) > 0 {
+		target = match[1]
+		targetArgument = target
+	} else {
 		return content, "", false
 	}
 	lineEnd := strings.IndexByte(content[block.close:], '\n')
@@ -497,10 +545,10 @@ func migrateSimpleKotlinOptions(content string) (string, string, bool) {
 	updated = strings.TrimRight(updated, "\r\n") + lineEnding + lineEnding +
 		"kotlin {" + lineEnding +
 		"    compilerOptions {" + lineEnding +
-		"        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(\"" + match[1] + "\")" + lineEnding +
+		"        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(" + targetArgument + ")" + lineEnding +
 		"    }" + lineEnding +
 		"}" + lineEnding
-	return updated, match[1], true
+	return updated, target, true
 }
 
 func insertIntoSingleBlock(content, name string, lines []string) (string, bool) {

@@ -5,7 +5,10 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/gay00ung/aargrade/internal/project"
 )
 
 func TestRunEvidenceWithoutBaseline(t *testing.T) {
@@ -77,6 +80,36 @@ func TestRunFailsUnsafeConsumerRule(t *testing.T) {
 	}
 	if report.Verdict != "fail" || statusFor(report, "r8.consumer-rules") != StatusFail {
 		t.Fatalf("report = %#v", report)
+	}
+}
+
+func TestKMPAndroidLibraryUsesBundleTask(t *testing.T) {
+	library := project.Module{
+		GradlePath: ":sdk",
+		Plugins:    []project.Plugin{{ID: "com.android.kotlin.multiplatform.library"}},
+	}
+	task, kmp, err := libraryAssembleTask(library, "release")
+	if err != nil || !kmp || task != ":sdk:bundleAndroidMainAar" {
+		t.Fatalf("task=%q kmp=%v err=%v", task, kmp, err)
+	}
+	if _, _, err := libraryAssembleTask(library, "debug"); err == nil || !strings.Contains(err.Error(), "one Android AAR") {
+		t.Fatalf("KMP debug variant should be rejected: %v", err)
+	}
+}
+
+func TestLocateKMPAndroidAARWithoutVariantSuffix(t *testing.T) {
+	module := t.TempDir()
+	output := filepath.Join(module, "build", "outputs", "aar")
+	if err := os.MkdirAll(output, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(output, "sdk.aar")
+	if err := os.WriteFile(want, []byte("fixture"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := locateAAR(module, "release", true)
+	if err != nil || got != want {
+		t.Fatalf("got=%q want=%q err=%v", got, want, err)
 	}
 }
 

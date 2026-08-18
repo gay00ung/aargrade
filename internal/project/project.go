@@ -442,6 +442,8 @@ func readDefaultCatalog(root string) (Catalog, error) {
 	versionPattern := regexp.MustCompile(`^\s*([A-Za-z0-9_.-]+)\s*=\s*["']([^"']+)["']\s*$`)
 	idPattern := regexp.MustCompile(`\bid\s*=\s*["']([^"']+)["']`)
 	modulePattern := regexp.MustCompile(`\bmodule\s*=\s*["']([^"']+)["']`)
+	groupPattern := regexp.MustCompile(`\bgroup\s*=\s*["']([^"']+)["']`)
+	namePattern := regexp.MustCompile(`\bname\s*=\s*["']([^"']+)["']`)
 	inlineVersionPattern := regexp.MustCompile(`\bversion\s*=\s*["']([^"']+)["']`)
 	versionRefPattern := regexp.MustCompile(`\bversion\.ref\s*=\s*["']([^"']+)["']`)
 	stringCoordinatePattern := regexp.MustCompile(`^\s*[A-Za-z0-9_.-]+\s*=\s*["']([^"']+)["']\s*$`)
@@ -479,6 +481,8 @@ func readDefaultCatalog(root string) (Catalog, error) {
 			library := CatalogLibrary{Version: version, Line: index + 1}
 			if moduleMatch := modulePattern.FindStringSubmatch(parts[1]); len(moduleMatch) > 0 {
 				library.Module = moduleMatch[1]
+			} else if groupMatch, nameMatch := groupPattern.FindStringSubmatch(parts[1]), namePattern.FindStringSubmatch(parts[1]); len(groupMatch) > 0 && len(nameMatch) > 0 {
+				library.Module = groupMatch[1] + ":" + nameMatch[1]
 			} else if coordinateMatch := stringCoordinatePattern.FindStringSubmatch(line); len(coordinateMatch) > 0 {
 				segments := strings.Split(coordinateMatch[1], ":")
 				if len(segments) >= 2 {

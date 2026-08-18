@@ -56,14 +56,17 @@ func buildCandidate(options Options) (buildResult, error) {
 	if err != nil {
 		return buildResult{}, err
 	}
-	taskVariant := strings.ToUpper(variant[:1]) + variant[1:]
+	assembleTask, kmpAndroidLibrary, err := libraryAssembleTask(library, variant)
+	if err != nil {
+		return buildResult{}, err
+	}
 	commands := []struct {
 		name string
 		args []string
 	}{
 		{name: "gradle-help", args: []string{"help", "--no-daemon"}},
 		{name: "gradle-dry-run", args: []string{"build", "--dry-run", "--no-daemon"}},
-		{name: "aar-assemble", args: []string{library.GradlePath + ":assemble" + taskVariant, "--no-daemon"}},
+		{name: "aar-assemble", args: []string{assembleTask, "--no-daemon"}},
 	}
 	result := buildResult{projectRoot: discovered.Root, libraryModule: library.GradlePath}
 	for _, command := range commands {
@@ -76,12 +79,23 @@ func buildCandidate(options Options) (buildResult, error) {
 			return result, nil
 		}
 	}
-	aarPath, err := locateAAR(library.Directory, variant)
+	aarPath, err := locateAAR(library.Directory, variant, kmpAndroidLibrary)
 	if err != nil {
 		return result, err
 	}
 	result.aarPath = aarPath
 	return result, nil
+}
+
+func libraryAssembleTask(library project.Module, variant string) (string, bool, error) {
+	if library.HasPlugin("com.android.kotlin.multiplatform.library") {
+		if !strings.EqualFold(variant, "release") {
+			return "", true, fmt.Errorf("Kotlin Multiplatform Android libraries expose one Android AAR; variant %q is not supported", variant)
+		}
+		return library.GradlePath + ":bundleAndroidMainAar", true, nil
+	}
+	taskVariant := strings.ToUpper(variant[:1]) + variant[1:]
+	return library.GradlePath + ":assemble" + taskVariant, false, nil
 }
 
 func selectLibrary(discovered *project.Project, requested string) (project.Module, error) {
@@ -167,7 +181,7 @@ func execute(parent context.Context, timeout time.Duration, directory, executabl
 	return evidence
 }
 
-func locateAAR(moduleDirectory, variant string) (string, error) {
+func locateAAR(moduleDirectory, variant string, kmpAndroidLibrary bool) (string, error) {
 	pattern := filepath.Join(moduleDirectory, "build", "outputs", "aar", "*.aar")
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
@@ -176,16 +190,20 @@ func locateAAR(moduleDirectory, variant string) (string, error) {
 	suffix := "-" + strings.ToLower(variant) + ".aar"
 	var candidates []string
 	for _, match := range matches {
-		if strings.HasSuffix(strings.ToLower(match), suffix) {
+		if kmpAndroidLibrary || strings.HasSuffix(strings.ToLower(match), suffix) {
 			candidates = append(candidates, match)
 		}
 	}
 	sort.Strings(candidates)
+	artifactKind := variant
+	if kmpAndroidLibrary {
+		artifactKind = "Kotlin Multiplatform Android"
+	}
 	if len(candidates) == 0 {
-		return "", fmt.Errorf("assemble succeeded but no %s AAR was found under %s", variant, filepath.Dir(pattern))
+		return "", fmt.Errorf("assemble succeeded but no %s AAR was found under %s", artifactKind, filepath.Dir(pattern))
 	}
 	if len(candidates) > 1 {
-		return "", fmt.Errorf("assemble produced multiple %s AARs; pass one explicitly with --candidate-aar: %s", variant, strings.Join(candidates, ", "))
+		return "", fmt.Errorf("assemble produced multiple %s AARs; pass one explicitly with --candidate-aar: %s", artifactKind, strings.Join(candidates, ", "))
 	}
 	return candidates[0], nil
 }

@@ -97,7 +97,9 @@ func Migrate(options MutationOptions) (MutationResult, error) {
 		}
 	}
 	result.Blockers = append(result.Blockers, mutationStructureBlockers(discovered, diagnosis)...)
-	if targetVersion.Major >= 9 {
+	currentVersion, currentVersionErr := toolchain.ParseVersion(result.CurrentAGP)
+	crossesIntoAGP9 := currentVersionErr == nil && currentVersion.Major < 9 && targetVersion.Major >= 9
+	if crossesIntoAGP9 {
 		result.Blockers = append(result.Blockers, agp9MutationBlockers(discovered, diagnosis, allBuildFiles, catalog, options.AutoRepair)...)
 	}
 
@@ -107,7 +109,6 @@ func Migrate(options MutationOptions) (MutationResult, error) {
 		return result, nil
 	}
 
-	currentVersion, _ := toolchain.ParseVersion(result.CurrentAGP)
 	contents := map[string]string{}
 	filesByRelative := map[string]migrationFile{}
 	for _, file := range buildFiles {
@@ -159,15 +160,15 @@ func Migrate(options MutationOptions) (MutationResult, error) {
 	}
 
 	if options.AutoRepair {
-		applyAssistantRepairs(discovered, targetVersion.Major, buildFiles, contents, filesByRelative, &result)
-		result.Blockers = append(result.Blockers, assistantRepairBlockers(discovered, targetVersion.Major, buildFiles, contents)...)
+		applyAssistantRepairs(discovered, targetVersion.Major, crossesIntoAGP9, buildFiles, contents, filesByRelative, &result)
+		result.Blockers = append(result.Blockers, assistantRepairBlockers(discovered, targetVersion.Major, crossesIntoAGP9, buildFiles, contents)...)
 		if len(result.Blockers) > 0 {
 			result.Blockers = sortAndUniqueStrings(result.Blockers)
 			return result, nil
 		}
 	}
 
-	if targetVersion.Major >= 9 {
+	if crossesIntoAGP9 {
 		kotlinAliases := catalogAliases(catalog, func(entry catalogEntry) bool { return entry.isKotlin })
 		removed := 0
 		for _, file := range buildFiles {
