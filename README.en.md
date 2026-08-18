@@ -75,7 +75,8 @@ Download the archive for your OS and CPU from
 | Windows x86-64 | `aargrade_<VERSION>_windows_amd64.zip` |
 | Windows ARM64 | `aargrade_<VERSION>_windows_arm64.zip` |
 
-After the first beta is published, an Apple Silicon installation looks like:
+The first public beta is `v0.1.0-beta.1`. An Apple Silicon installation looks
+like:
 
 ```bash
 AARGRADE_VERSION=v0.1.0-beta.1
@@ -125,8 +126,8 @@ aargrade upgrade \
 The baseline is optional. Apply mode updates AGP and the Wrapper, repairs safe
 forms of missing namespace plus its legacy manifest package, custom BuildConfig
 enablement, legacy SDK setters, AGP 9 Built-in Kotlin, and Java/Kotlin JVM
-target alignment. It then runs `help`, `build --dry-run`, release AAR assembly,
-and AAR inspection. Add
+target alignment. It then runs `help`, `build --dry-run`, classic release or
+KMP Android AAR assembly, and AAR inspection. Add
 `--matrix-config aargrade.yml` to run declared consumers too. A failure is
 classified and rolls the owned configuration back unless
 `--keep-failed-changes` is explicitly supplied.
@@ -343,6 +344,7 @@ Run the reproducible host lifecycle alone with:
 make test-upgrade-assistant-fixture
 make test-migration-smoke
 make test-upgrade-agent-smoke
+make test-external
 ```
 
 CI runs Go tests on Linux, macOS, and Windows, builds the public example AAR,
@@ -361,6 +363,12 @@ The agent smoke starts from missing namespace, implicit BuildConfig, legacy SDK
 setters, and `kotlinOptions`; one `upgrade --apply` repairs them, builds and
 inspects a real release AAR, then proves byte-exact rollback.
 
+An opt-in pinned external corpus also validates Timber, Picasso, Lottie, and
+Glide. Applied AGP 9 upgrades passed Gradle and AAR verification for Timber and
+Glide; Picasso produced a complete preview, while Lottie's RefreshVersions
+boundary stopped safely. See the
+[Korean evidence record](docs/product/external-validation-2026-08.ko.md).
+
 ## Design and validation
 
 - [CLI contract](docs/cli.md)
@@ -368,12 +376,16 @@ inspects a real release AAR, then proves byte-exact rollback.
 - [릴리스 방법](docs/releasing.ko.md)
 - [Product and delivery plan](docs/product/plan.md)
 - [Validation evidence](docs/product/validation.md)
+- [Pinned external-project evidence (Korean)](docs/product/external-validation-2026-08.ko.md)
 - [Upgrade Assistant A/B evidence](docs/product/upgrade-assistant-experiment.md)
 - [Upgrade Assistant A/B evidence (Korean)](docs/product/upgrade-assistant-experiment.ko.md)
 - [Consumer R8 fixture analysis](R8_Configuration_Analysis.md)
 - [CLI runtime decision](docs/adr/0001-cli-runtime.md)
 - [Bounded migration transaction decision](docs/adr/0003-bounded-migration-transactions.md)
 - [Agent-style upgrade orchestration decision](docs/adr/0004-agent-upgrade-orchestration.md)
+- [Changelog](CHANGELOG.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
 
 Source and release binaries are provided under the [Apache License 2.0](LICENSE).
 

@@ -93,7 +93,8 @@ CPU에 맞는 파일을 받습니다.
 | 일반 64비트 Windows | `aargrade_<VERSION>_windows_amd64.zip` |
 | ARM64 Windows | `aargrade_<VERSION>_windows_arm64.zip` |
 
-첫 베타가 공개된 뒤 Apple Silicon Mac에서는 다음처럼 설치할 수 있습니다.
+첫 공개 베타 `v0.1.0-beta.1`을 Apple Silicon Mac에 설치하는 예시는 다음과
+같습니다.
 
 ```bash
 AARGRADE_VERSION=v0.1.0-beta.1
@@ -121,8 +122,7 @@ export PATH="$(go env GOPATH)/bin:$PATH"
 aargrade version
 ```
 
-태그가 아직 공개되지 않았거나 개발 버전을 확인하려면 저장소에서 직접
-빌드합니다.
+최신 개발 버전을 확인하려면 저장소에서 직접 빌드합니다.
 
 ```bash
 make build VERSION=dev
@@ -158,7 +158,8 @@ aargrade upgrade \
 2. AGP·Wrapper를 바꾸고 `namespace`/옛 manifest package, custom
    `BuildConfig`, 단순 SDK setter, AGP 9 Built-in Kotlin, Java/Kotlin JVM
    target을 안전한 규칙으로 수리합니다.
-3. 프로젝트 Wrapper로 `help`, `build --dry-run`, `:sdk:assembleRelease`를
+3. 프로젝트 Wrapper로 `help`, `build --dry-run`, 일반 Android library의
+   `assembleRelease` 또는 KMP Android library의 `bundleAndroidMainAar`를
    실제 실행합니다.
 4. 생성된 AAR 구조·metadata·Consumer R8·JNI를 검사하고, 기준 AAR이 있으면
    JVM binary surface도 비교합니다.
@@ -238,6 +239,8 @@ aargrade migrate --project . --target-agp 9.2.0 --apply
 - 기본 `gradle/libs.versions.toml`의 AGP version/ref
 - 목표 AGP가 요구하는 최소 Gradle Wrapper URL과 공식 SHA-256
 - 안전한 단일 줄 Kotlin Android plugin 제거와 AGP 9 Built-in Kotlin 전환
+- 숫자 또는 제한된 `libs.versions.*.get()` 값을 쓰는 구형 SDK setter와
+  일치하는 Java/Kotlin JVM target 전환
 - 완전 전환 뒤 불필요해진 `android.builtInKotlin`, `android.newDsl` 등
 
 다음 항목은 추측해서 바꾸지 않고 `BLOCKED`로 중단합니다.
@@ -466,6 +469,7 @@ make example-verify # 예제 AAR 빌드 후 기준/후보 비교
 make test-upgrade-assistant-fixture
 make test-migration-smoke # AGP 8.8 → 9.2 적용, Kotlin/AAR 빌드, 원본 복원
 make test-upgrade-agent-smoke # 자동 수리 → 실제 빌드/AAR 검사 → 원본 복원
+make test-external # 네 개의 고정 공개 프로젝트 진단·업그레이드 미리보기
 ```
 
 사용자 관점의 흐름은 [`tests/integration`](tests/integration)에 따로 두었고,
@@ -492,6 +496,12 @@ release AAR 생성을 마친 뒤 모든 소유 설정이 byte 단위로 복원�
 implicit BuildConfig, `kotlinOptions`가 남은 fixture를 `upgrade --apply` 한 번으로
 수리한 뒤 실제 release AAR을 검사하고 정확히 원복합니다.
 
+별도의 opt-in 외부 검증은 Timber와 Glide의 AGP 9 업그레이드를 실제 적용해
+Gradle/AAR 검사까지 통과했고, Picasso는 변경안을 생성했으며, Lottie의
+RefreshVersions 경계에서는 추측하지 않고 중단했습니다. 고정 커밋과 재현법은
+[외부 프로젝트 검증 기록](docs/product/external-validation-2026-08.ko.md)에
+있습니다.
+
 이 결과는 **설정한 네 환경의 빌드 증거**이지 모든 고객, 모든 API 호출,
 실기기 런타임을 보장한다는 뜻은 아닙니다.
 
@@ -502,12 +512,16 @@ implicit BuildConfig, `kotlinOptions`가 남은 fixture를 `upgrade --apply` 한
 - [Release guide (English)](docs/releasing.md)
 - [제품 및 개발 계획](docs/product/plan.md)
 - [검증 기록](docs/product/validation.md)
+- [외부 프로젝트 실제 검증 기록 (한국어)](docs/product/external-validation-2026-08.ko.md)
 - [Upgrade Assistant A/B 실제 결과 (한국어)](docs/product/upgrade-assistant-experiment.ko.md)
 - [Upgrade Assistant A/B evidence (English)](docs/product/upgrade-assistant-experiment.md)
 - [Consumer R8 테스트 설정 분석](R8_Configuration_Analysis.md)
 - [CLI 런타임 결정 기록](docs/adr/0001-cli-runtime.md)
 - [자동 마이그레이션·롤백 안전성 결정](docs/adr/0003-bounded-migration-transactions.md)
 - [에이전트형 업그레이드 오케스트레이션 결정](docs/adr/0004-agent-upgrade-orchestration.md)
+- [변경 기록](CHANGELOG.md)
+- [기여 방법](CONTRIBUTING.md)
+- [보안 정책](SECURITY.md)
 
 소스와 릴리스 바이너리는 [Apache License 2.0](LICENSE)으로 배포합니다.
 

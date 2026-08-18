@@ -1,6 +1,6 @@
 # AARGrade product and delivery plan
 
-## Implementation status (2026-08-14)
+## Implementation status (2026-08-18)
 
 - Milestone 1 is implemented: read-only diagnosis and ownership-safe host
   preview/apply/removal.
@@ -15,6 +15,10 @@
   repairs, migration, real Gradle/AAR verification, optional consumer cells,
   failure classification, and default rollback. A dedicated legacy-DSL fixture
   passes the complete AGP 8.8 → 9.2 lifecycle.
+- Pinned external validation now covers Timber, Picasso, Lottie, and Glide.
+  Applied AGP 9.2.x → 9.3.1 runs passed Gradle and AAR verification for both a
+  KMP Android library and a large classic multi-module library; a dynamic
+  RefreshVersions project stopped fail-closed.
 - Milestone 3 is implemented and Gate D passed locally: the public AAR built in
   AGP 4.2.2 and 9.2.0 Java/Kotlin consumers with explicit JDK 11/17. CI is
   configured to repeat all four cells.
@@ -23,8 +27,8 @@
   implemented.
 - Distribution automation is implemented: SemVer tags build six macOS, Linux,
   and Windows archives, verify their contents and embedded version, publish
-  SHA-256 checksums, and create a GitHub prerelease or stable release. The first
-  public tag remains an explicit maintainer action.
+  SHA-256 checksums, and create a GitHub prerelease or stable release. The
+  release candidate is prepared for the explicit `v0.1.0-beta.1` tag.
 - Upgrade Assistant Gates A and C passed in a controlled A→B→A experiment:
   Android Studio could not obtain an application project in the library-only
   baseline, loaded an AGP 7.4.2 migration plan after `host add`, and returned
@@ -196,8 +200,9 @@ to handle those project-specific cases before rerunning the same operation.
   Studio build `AI-253.30387.90.2532.14901460` logged `Unable to obtain
   application's Android Project` and exposed no usable plan.
 - **Gate B — diagnostic usefulness (passed technically):** Timber, Picasso,
-  and Lottie trials classified useful, noisy, and unresolved findings and led
-  to concrete parser/diagnostic corrections. External adoption remains open.
+  Lottie, and Glide trials classified useful, noisy, and unresolved findings
+  and led to concrete parser, migration, and KMP AAR verification corrections.
+  Two applied AGP 9 upgrades passed; external adoption remains open.
 - **Gate C — host necessity (passed in the same environment):** `host add`
   changed the reproduced failure into an AGP 7.4.2 → 8.13.2 plan; exact removal
   restored settings and the failure state. See the

@@ -123,16 +123,18 @@ nothing and does not invoke Gradle. Apply mode performs this sequence:
 2. prepare one hash-owned transaction for supported AGP, Wrapper, and AGP 9
    changes;
 3. repair safely recognized forms of a missing namespace and its legacy source
-   manifest package, implicit custom BuildConfig feature, numeric legacy SDK setters, simple
-   `android.kotlinOptions.jvmTarget`, and missing Java target alignment;
-4. run Wrapper `help`, `build --dry-run`, and selected library assembly;
+   manifest package, implicit custom BuildConfig feature, numeric or narrowly
+   version-catalog-backed legacy SDK setters, simple
+   `android.kotlinOptions.jvmTarget`, and matching Java target alignment;
+4. run Wrapper `help`, `build --dry-run`, and selected classic or KMP Android
+   library assembly;
 5. inspect the candidate AAR and compare the optional baseline;
 6. run the optional consumer matrix; and
 7. classify a failure and automatically roll back the owned configuration,
    unless `--keep-failed-changes` was explicitly supplied.
 
 The repair engine is deterministic, not a bundled language model. Existing
-Java target declarations, complex Kotlin compiler/source-set blocks, kapt/KSP
+Conflicting Java targets, complex Kotlin compiler/source-set blocks, kapt/KSP
 decisions, convention-plugin internals, legacy Variant APIs, and ambiguous
 dynamic logic remain blockers or project-specific agent work. Over MCP, the
 structured blockers and bounded Gradle output let an external agent edit those
@@ -295,7 +297,9 @@ order and stops on the first failure:
 
 1. `help --no-daemon`
 2. `build --dry-run --no-daemon`
-3. `<library>:assemble<Variant> --no-daemon`
+3. `<library>:assemble<Variant> --no-daemon`, or
+   `<library>:bundleAndroidMainAar --no-daemon` for an AGP Kotlin Multiplatform
+   Android library
 
 The artifact inspector rejects symlinked/non-regular AARs, unsafe or duplicate
 ZIP paths, and bounded-size violations. It records entry and artifact SHA-256,

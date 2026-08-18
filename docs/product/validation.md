@@ -1,6 +1,6 @@
 # Validation log
 
-Checked through **2026-08-14**. This document separates verified facts from product
+Checked through **2026-08-18**. This document separates verified facts from product
 hypotheses; it is not a claim that market demand has already been proven.
 
 ## Verified ecosystem facts
@@ -64,18 +64,31 @@ tested separately in the controlled A/B experiment below.
 
 ### External repository trials
 
-`doctor` was run read-only against shallow clones of these public repositories:
+`doctor` and preview-first `upgrade` were run against pinned clones of these
+public repositories. Applied verification was limited to projects already on
+AGP 9:
 
-| Repository and commit | Useful result | Noise or limitation found | Change made |
+| Repository and commit | Validation result | Product correction |
 | --- | --- | --- | --- |
-| [JakeWharton/timber](https://github.com/JakeWharton/timber) `5ddea1c9c912ea785ab752f244168260ae8dabd8` | Classified the KMP Android library and sample app; resolved AGP 9.3.1. | Initially warned about kapt in a non-Android lint module. | Restricted kapt/KSP migration findings to resolved Android module kinds. |
-| [square/picasso](https://github.com/square/picasso) `e94d6116e3fff99b3932103e0ab22ff5b44a1273` | Classified five libraries and one sample app; resolved AGP 8.7.2. | Initially missed Groovy `include 'module'` and classpath aliases declared in catalog `[libraries]`. | Added colonless include normalization and catalog library-coordinate resolution. |
-| [airbnb/lottie-android](https://github.com/airbnb/lottie-android) `05ea92e90381eb8a8ae06855ea2b74f322bebbec` | Classified application, library, and test modules; found Android Kotlin, kapt, and KSP migration signals. | AGP stays unresolved because RefreshVersions owns its effective mapping. | Added an explicit RefreshVersions limitation instead of guessing the AGP version; classified `com.android.test` separately. |
+| [JakeWharton/timber](https://github.com/JakeWharton/timber) `c51c0cad85bfd4c4c452222dae5ec49e8988303a` | AGP 9.2.1 → 9.3.1 applied; `help`, full dry-run, KMP AAR assembly, and AAR inspection passed. | Preserve Kotlin/KMP setup on AGP 9 minor upgrades; use `bundleAndroidMainAar` and locate suffixless KMP AARs. |
+| [square/picasso](https://github.com/square/picasso) `e94d6116e3fff99b3932103e0ab22ff5b44a1273` | AGP 8.7.2 → 9.3.1 preview became ready across six Groovy Android modules. | Handle consecutive Groovy plugin lines and narrowly migrate matching `libs.versions.*.get()` SDK/JVM target expressions. |
+| [airbnb/lottie-android](https://github.com/airbnb/lottie-android) `05ea92e90381eb8a8ae06855ea2b74f322bebbec` | Diagnosis succeeded; upgrade stopped because RefreshVersions owns the effective AGP mapping. | Keep the dynamic-version boundary explicit and fail-closed instead of guessing. |
+| [bumptech/glide](https://github.com/bumptech/glide) `bf4901de78c206ed21ce73f5d25aa2bbf35ebf3c` | AGP 9.2.0 → 9.3.1 and Gradle 9.4.1 → 9.5.0 applied; large dry-run, release AAR assembly, and inspection passed. | Resolve catalog libraries declared with separate `group` and `name`; preserve existing AGP 9 Kotlin/KSP setup. |
+
+The Timber AAR was 32,705 bytes with SHA-256
+`3270214ff2784195326b0a67da50404f7cb36291e30b50690e6cb0dba38d19f1`.
+The Glide AAR was 719,394 bytes with SHA-256
+`59e1c99532535b4ce15973539a9359af0efbe903c8215dad415eb74b64cc52c7`;
+its three broad Consumer R8 rules were retained as review warnings. Both
+successful runs finished with hash-checked migration acceptance. The pinned
+protocol is executable through `make test-external`, with applied Gradle work
+requiring explicit `AARGRADE_EXTERNAL_APPLY=1`. See the
+[Korean detailed record](external-validation-2026-08.ko.md).
 
 These trials validate useful structural coverage across Kotlin DSL, Groovy DSL,
 KMP Android, version catalogs, classic buildscript classpaths, Android test
 modules, and dynamic version management. They are technical trials, not demand
-validation or proof of Upgrade Assistant failure.
+validation or proof of every source/runtime compatibility property.
 
 ### Upgrade Assistant A/B status
 
@@ -323,8 +336,8 @@ can continue the loop.
   GitHub prereleases, while tags such as `v0.1.0` create stable releases.
 - Publishing rejects a tag whose commit is not an ancestor of `origin/main`.
 
-This validates the packaging and publication path without creating a public
-tag. The first tag remains a deliberate maintainer action.
+This validates the packaging and publication path. The GitHub Releases page
+and the tag-triggered workflow are the authoritative publication record.
 
 ## Unverified hypotheses
 
