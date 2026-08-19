@@ -12,7 +12,7 @@
 | [Picasso](https://github.com/square/picasso) | `e94d6116e3fff99b3932103e0ab22ff5b44a1273` | AGP 8.7.2, Gradle 8.10.2, Groovy DSL | 9.3.1 변경 미리보기 | 준비 완료 |
 | [Lottie Android](https://github.com/airbnb/lottie-android) | `05ea92e90381eb8a8ae06855ea2b74f322bebbec` | RefreshVersions가 AGP 관리 | 진단·변경 미리보기 | 안전하게 중단 |
 | [Glide](https://github.com/bumptech/glide) | `bf4901de78c206ed21ce73f5d25aa2bbf35ebf3c` | AGP 9.2.0, Gradle 9.4.1, 대형 멀티모듈 | 9.3.1 실제 적용·Gradle·AAR 검사 | 통과 |
-| [Adjust Android SDK](https://github.com/adjust/android_sdk) | `b31ee274a2d189c4ff705c2ee6c47ad09ca5eb62` | AGP 9.2.1, Gradle 9.6.0, Groovy `buildscript.ext` | 9.3.1 미리보기와 별도 실전 AAR·매트릭스 검증 | 통과 |
+| [Adjust Android SDK](https://github.com/adjust/android_sdk) | `b31ee274a2d189c4ff705c2ee6c47ad09ca5eb62` | AGP 9.2.1, Gradle 9.6.0, Groovy `buildscript.ext` | 9.3.1 실제 적용·기존 root 실패 비교·AAR·매트릭스 검증 | 통과 |
 
 ## 실제 적용 결과
 
@@ -41,6 +41,19 @@
 두 성공 케이스 모두 검증 후 `migrate accept --apply`가 적용 파일의 hash를
 확인하고 rollback 상태만 안전하게 제거했다.
 
+### Adjust Android SDK
+
+- 적용 전 AGP 9.2.1과 적용 후 AGP 9.3.1의 전체 `build --dry-run`에서 같은
+  `packageReleaseAssets` task 오류가 발생했다.
+- AARGrade는 정규화한 실패 fingerprint가 정확히 같은 것을 확인해 이를
+  기존 root 실패 경고로 남겼다.
+- 그 뒤 선택한 `:sdk-core:assembleRelease --dry-run`, 실제 AAR 조립, Maven
+  Central 기준 AAR과의 정적 비교가 모두 통과해야 `upgrade --apply`가
+  `PASS`를 반환했다.
+- 이 결과는 선택한 SDK 모듈의 증거이며 Adjust 저장소 전체 빌드가 정상이라는
+  뜻은 아니다. 세부 명령과 소비자 네 셀 결과는
+  [Adjust 실전 검증 기록](adjust-sdk-dogfood-2026-08-19.ko.md)에 있다.
+
 ## 미리보기와 중단 결과
 
 - Picasso에서는 여섯 Android 모듈의 AGP/Wrapper, 연속 Groovy `apply plugin`,
@@ -60,6 +73,9 @@
 5. KMP Android library의 `bundleAndroidMainAar` 태스크와 접미사 없는 AAR
    탐색
 6. 단일 literal Groovy `buildscript.ext` AGP 변수의 보수적 인식과 변경
+7. 적용 전·후 전체 Gradle dry-run을 비교해 기존 실패와 마이그레이션 회귀를
+   구분하고, 기존 실패여도 선택한 라이브러리 dry-run과 AAR 조립을 강제하는
+   검증 흐름
 
 모든 수정에는 회귀 테스트가 추가됐다. 임의 함수 호출, 서로 다른 Java/Kotlin
 provider, RefreshVersions와 복잡한 convention logic은 계속 자동 변경하지

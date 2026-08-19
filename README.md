@@ -21,7 +21,8 @@ AARGrade는 **Android 라이브러리와 SDK 제작자를 위한 AGP 마이그�
 ```text
 현재 프로젝트 진단
 → AGP 업그레이드 변경안과 자동 수리 미리보기
-→ 적용 후 Gradle 구성·dry-run·AAR 빌드 자동 검증
+→ 적용 전·후 전체 Gradle dry-run 비교
+→ 선택한 라이브러리 dry-run·AAR 빌드 자동 검증
 → 기준 AAR과 후보 AAR 비교 및 선택적 고객 매트릭스 빌드
 → 실패 원인 분류와 안전한 자동 롤백
 → 결과를 사람, CI, MCP 에이전트가 같은 형식으로 사용
@@ -155,17 +156,29 @@ aargrade upgrade \
 수행합니다.
 
 1. AGP/Gradle/JDK와 차단 항목을 진단합니다.
-2. AGP·Wrapper를 바꾸고 `namespace`/옛 manifest package, custom
+2. 파일을 바꾸기 전에 프로젝트 전체 `build --dry-run` 결과를 기준 증거로
+   기록합니다. 원래부터 실패하던 프로젝트도 여기서 바로 중단하지 않습니다.
+3. AGP·Wrapper를 바꾸고 `namespace`/옛 manifest package, custom
    `BuildConfig`, 단순 SDK setter, AGP 9 Built-in Kotlin, Java/Kotlin JVM
    target을 안전한 규칙으로 수리합니다.
-3. 프로젝트 Wrapper로 `help`, `build --dry-run`, 일반 Android library의
-   `assembleRelease` 또는 KMP Android library의 `bundleAndroidMainAar`를
-   실제 실행합니다.
-4. 생성된 AAR 구조·metadata·Consumer R8·JNI를 검사하고, 기준 AAR이 있으면
+4. 프로젝트 Wrapper로 `help`와 적용 후 전체 `build --dry-run`을 실행해 적용
+   전 결과와 비교합니다. 새로 실패했거나 실패 내용이 달라졌으면 회귀로 보고
+   중단합니다.
+5. 전체 dry-run이 통과했거나 적용 전과 같은 실패라면, 선택한 일반 Android
+   library의 `assembleRelease --dry-run` 또는 KMP Android library의
+   `bundleAndroidMainAar --dry-run`을 실행한 뒤 실제 AAR을 조립합니다.
+6. 생성된 AAR 구조·metadata·Consumer R8·JNI를 검사하고, 기준 AAR이 있으면
    JVM binary surface도 비교합니다.
-5. `--matrix-config aargrade.yml`을 주면 실제 Java/Kotlin 고객 셀까지
+7. `--matrix-config aargrade.yml`을 주면 실제 Java/Kotlin 고객 셀까지
    빌드합니다.
-6. 어느 단계든 실패하면 원인을 분류하고 기본적으로 설정을 원복합니다.
+8. 어느 단계든 실패하면 원인을 분류하고 기본적으로 설정을 원복합니다.
+
+적용 전·후의 실패는 Gradle 출력 중 정규화한 `What went wrong` 핵심 내용이
+정확히 같고 exit code도 같을 때만 기존 실패로 인정됩니다. 시간 초과·취소,
+출력이 잘렸거나 내용 없는 실패와 서로 다른 오류는 통과시키지 않습니다. 기존 전체 실패가 경고로 분리돼도
+선택한 라이브러리 task graph와 AAR 조립은 반드시 성공해야 합니다. 따라서
+이 판정은 **선택한 라이브러리의 마이그레이션 증거**이지 저장소 전체가
+정상이라는 선언이 아닙니다.
 
 성공한 경우에는 검토할 수 있도록 rollback 상태를 남깁니다. 되돌리거나,
 변경을 최종 채택해 파일은 유지한 채 rollback 상태만 정리할 수 있습니다.
@@ -282,7 +295,9 @@ aargrade verify \
 ```
 
 후보 AAR 경로를 생략하면 AARGrade가 프로젝트의 Gradle Wrapper로 `help`,
-`build --dry-run`, release AAR 조립을 차례로 실행합니다.
+전체 `build --dry-run`, 선택한 release AAR task의 `--dry-run`, 실제 AAR
+조립을 차례로 실행합니다. 독립 `verify`에는 적용 전 기준 실행이 없으므로
+전체 `build --dry-run` 실패를 기존 오류로 완화하지 않고 그대로 실패합니다.
 
 ```bash
 aargrade verify \
@@ -471,7 +486,7 @@ make example-verify # 예제 AAR 빌드 후 기준/후보 비교
 make test-upgrade-assistant-fixture
 make test-migration-smoke # AGP 8.8 → 9.2 적용, Kotlin/AAR 빌드, 원본 복원
 make test-upgrade-agent-smoke # 자동 수리 → 실제 빌드/AAR 검사 → 원본 복원
-make test-external # 네 개의 고정 공개 프로젝트 진단·업그레이드 미리보기
+make test-external # 다섯 개의 고정 공개 프로젝트 진단·업그레이드 미리보기
 ```
 
 사용자 관점의 흐름은 [`tests/integration`](tests/integration)에 따로 두었고,
@@ -502,7 +517,10 @@ implicit BuildConfig, `kotlinOptions`가 남은 fixture를 `upgrade --apply` 한
 Gradle/AAR 검사까지 통과했고, Picasso는 변경안을 생성했으며, Lottie의
 RefreshVersions 경계에서는 추측하지 않고 중단했습니다. Adjust Android SDK
 5.8.0은 Maven Central 기준 AAR과 비교하고 AGP 4.2.2/9.3.1의 Java/Kotlin 실제
-소비자 네 환경을 모두 통과했습니다. 고정 커밋과 재현법은
+소비자 네 환경을 모두 통과했습니다. 또한 적용 전·후에 동일하게 존재하던
+전체 `build --dry-run` 오류를 자동으로 기존 실패로 분리하고, 선택한
+`:sdk-core` dry-run·AAR 조립·정적 비교까지 한 번의 `upgrade --apply`로
+통과했습니다. 고정 커밋과 재현법은
 [외부 프로젝트 검증 기록](docs/product/external-validation-2026-08.ko.md)에
 있고, Adjust 전체 결과는
 [Adjust SDK 실전 검증 기록](docs/product/adjust-sdk-dogfood-2026-08-19.ko.md)에

@@ -306,6 +306,16 @@ This proves protocol behavior, not broad external demand for the integration.
 - A failed applied verification is categorized and exact owned configuration is
   automatically rolled back by default. Unit tests inject a Gradle namespace
   failure and verify both the category and byte-exact restoration.
+- Applied upgrades retain a bounded whole-project dry-run before mutation and
+  compare it with the post-migration run. Tests cover an identical pre-existing
+  failure, a newly introduced failure, a different failure, a resolved failure,
+  and timeout/cancellation fail-closed behavior. An accepted pre-existing root
+  failure still requires the selected library dry-run and AAR assembly.
+- Adjust Android SDK 5.8.0 exercises that branch with real Gradle: the same
+  missing `packageReleaseAssets` task failed before and after AGP 9.2.1 → 9.3.1,
+  while `:sdk-core` dry-run, assembly, released-AAR ABI, metadata, R8, and JNI
+  evidence passed. The report remained explicit that this was not a clean
+  whole-repository build.
 - A separate permission-failure test stops the multi-file write after ownership
   state and earlier files were written, then verifies that `upgrade` classifies
   the incomplete apply and restores every partial change automatically.

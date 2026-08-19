@@ -13,7 +13,7 @@ project, plan the toolchain change, inspect the candidate AAR, and build that
 artifact in isolated old and current Java/Kotlin consumers.
 
 ```text
-diagnose → preview repairs → migrate → build/inspect AAR → optional consumer matrix → classify failure/roll back
+diagnose → preview repairs → compare pre/post-migration dry-runs → build/inspect AAR → optional consumer matrix → classify failure/roll back
 ```
 
 Start with `upgrade`. It orchestrates diagnosis, known AGP repairs, migration,
@@ -123,14 +123,24 @@ aargrade upgrade \
   --apply
 ```
 
-The baseline is optional. Apply mode updates AGP and the Wrapper, repairs safe
+The baseline is optional. Apply mode first records the unmodified project's
+whole-project `build --dry-run`. It then updates AGP and the Wrapper, repairs safe
 forms of missing namespace plus its legacy manifest package, custom BuildConfig
 enablement, legacy SDK setters, AGP 9 Built-in Kotlin, and Java/Kotlin JVM
-target alignment. It then runs `help`, `build --dry-run`, classic release or
-KMP Android AAR assembly, and AAR inspection. Add
+target alignment. It runs `help`, repeats the whole-project dry-run, and compares
+the normalized Gradle failure evidence. A new or different failure is a
+regression. An exactly matching pre-existing failure is retained as a warning,
+but only after the selected classic or KMP Android AAR task passes its own
+dry-run and real assembly. AAR inspection follows. Add
 `--matrix-config aargrade.yml` to run declared consumers too. A failure is
 classified and rolls the owned configuration back unless
 `--keep-failed-changes` is explicitly supplied.
+
+Only a non-empty, exactly equal normalized `What went wrong` block with the
+same exit code can be classified as pre-existing. Timeouts, cancellations,
+truncated output, and unrecognized or different failures remain fatal. A pass with that warning proves the selected
+library migration and AAR evidence; it does not claim that the whole repository
+is healthy.
 
 After a pass, either preview/apply exact rollback or accept the migration and
 remove its rollback state while leaving the migrated files intact:
@@ -205,7 +215,10 @@ aargrade verify \
 ```
 
 When `--candidate-aar` is omitted, AARGrade discovers the library and runs the
-project wrapper through `help`, `build --dry-run`, and variant assembly:
+project wrapper through `help`, whole-project `build --dry-run`, the selected
+variant task with `--dry-run`, and real variant assembly. Standalone `verify`
+has no pre-migration run to compare, so any whole-project dry-run failure stays
+fatal:
 
 ```bash
 aargrade verify \
@@ -368,7 +381,10 @@ An opt-in pinned external corpus also validates Timber, Picasso, Lottie, Glide,
 and Adjust. Applied AGP 9 upgrades passed Gradle and AAR verification for
 Timber and Glide; Picasso produced a complete preview, while Lottie's
 RefreshVersions boundary stopped safely. Adjust 5.8.0 additionally passed a
-released-AAR comparison and AGP 4.2.2/9.3.1 Java/Kotlin consumer builds. See
+released-AAR comparison and AGP 4.2.2/9.3.1 Java/Kotlin consumer builds. A full
+`upgrade --apply` also classified Adjust's identical pre/post-migration root
+dry-run failure as pre-existing, then passed the selected `:sdk-core` dry-run,
+AAR assembly, and static comparison. See
 the [Korean corpus record](docs/product/external-validation-2026-08.ko.md) and
 the [Adjust dogfood record](docs/product/adjust-sdk-dogfood-2026-08-19.ko.md).
 

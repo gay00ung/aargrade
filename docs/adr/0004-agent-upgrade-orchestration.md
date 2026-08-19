@@ -24,8 +24,12 @@ the result less trustworthy.
   duplicate their policies.
 - Agent repairs are explicit, deterministic recipes with ambiguity checks.
   Unsupported structures remain blockers with structured suggested actions.
-- Apply runs the project Wrapper through `help`, `build --dry-run`, and selected
-  library assembly before inspecting the produced AAR and optional baseline.
+- Apply records a whole-project Wrapper `build --dry-run` before mutation,
+  repeats it after mutation, and fails on a new or different normalized Gradle
+  failure. An exactly matching pre-existing failure is retained as a warning
+  only when the selected library task also passes `--dry-run` and real assembly.
+- Apply runs Wrapper `help` after mutation before inspecting the produced AAR
+  and optional baseline.
 - A configured consumer matrix is the final optional evidence stage.
 - Failed or incomplete applied runs roll back the hash-owned configuration by
   default. Preserving failed changes requires an explicit option.
@@ -42,3 +46,9 @@ artifact evidence, and configuration failures are recoverable by default.
 Recipe coverage is intentionally narrower than arbitrary Android Studio or
 human-assisted migrations. New recipes require fixtures, real Gradle evidence,
 and a fail-closed rule for ambiguous syntax.
+
+Projects with an unrelated, already-broken root `build` task can still produce
+scoped selected-library evidence without hiding the failure. The report keeps
+both command outputs and explicitly avoids claiming whole-repository health.
+Timeouts, cancellations, empty evidence, and non-identical failures remain
+fatal and use the normal automatic rollback path.

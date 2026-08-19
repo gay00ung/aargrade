@@ -191,6 +191,13 @@ configuration, task graph, AAR assembly, and artifact checks requested by the
 user. A failed or incomplete run must retain bounded evidence, classify a
 useful cause, and restore owned configuration by default.
 
+Apply mode records a whole-project dry-run before mutation and compares it with
+the post-migration run. A pre-existing failure may be downgraded only when a
+non-empty normalized Gradle failure block matches exactly and the selected
+library task graph plus AAR assembly still succeed. New, different, timed-out,
+canceled, or unrecognized failures remain fatal. The report must scope this
+warning to the selected library rather than claiming whole-repository health.
+
 Known deterministic repair recipes may expand only with fixture coverage and a
 fail-closed ambiguity rule. Arbitrary convention logic and source semantics are
 not silently guessed; MCP agents may use structured blockers and Gradle output
@@ -206,7 +213,9 @@ to handle those project-specific cases before rerunning the same operation.
   Lottie, Glide, and Adjust trials classified useful, noisy, and unresolved
   findings and led to concrete parser, migration, and KMP AAR verification
   corrections. Two full-project AGP 9 upgrades and Adjust's selected SDK module
-  passed; external adoption remains open.
+  passed. Adjust also proved that an unchanged pre-existing root dry-run failure
+  can be isolated without hiding a selected-library regression; external
+  adoption remains open.
 - **Gate C — host necessity (passed in the same environment):** `host add`
   changed the reproduced failure into an AGP 7.4.2 → 8.13.2 plan; exact removal
   restored settings and the failure state. See the

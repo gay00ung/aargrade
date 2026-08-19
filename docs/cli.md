@@ -120,21 +120,40 @@ Preview calls the same migration engine with agent repairs enabled but writes
 nothing and does not invoke Gradle. Apply mode performs this sequence:
 
 1. discover and statically diagnose the project;
-2. prepare one hash-owned transaction for supported AGP, Wrapper, and AGP 9
-   changes;
-3. repair safely recognized forms of a missing namespace and its legacy source
+2. prepare the supported AGP, Wrapper, and AGP 9 changes without writing;
+3. run the unmodified project's Wrapper `build --dry-run --no-daemon` and retain
+   the complete bounded command evidence as the pre-migration baseline;
+4. revalidate every input and apply one hash-owned transaction, including
+   safely recognized forms of a missing namespace and its legacy source
    manifest package, implicit custom BuildConfig feature, numeric or narrowly
    version-catalog-backed legacy SDK setters, simple
    `android.kotlinOptions.jvmTarget`, and matching Java target alignment;
-4. run Wrapper `help`, `build --dry-run`, and selected classic or KMP Android
-   library assembly;
-5. inspect the candidate AAR and compare the optional baseline;
-6. run the optional consumer matrix; and
-7. classify a failure and automatically roll back the owned configuration,
+5. run Wrapper `help`, repeat the whole-project `build --dry-run`, and compare
+   its normalized failure evidence with the pre-migration result;
+6. run the selected classic or KMP Android library assembly task first with
+   `--dry-run` and then normally;
+7. inspect the candidate AAR and compare the optional baseline;
+8. run the optional consumer matrix; and
+9. classify a failure and automatically roll back the owned configuration,
    unless `--keep-failed-changes` was explicitly supplied.
 
+If both whole-project dry-runs fail, only a non-empty and exactly equal
+normalized Gradle `What went wrong` block with the same exit code is classified as
+`pre-existing-failure`. The post-migration command remains visible with its
+non-zero exit code but receives warning evidence, and the selected library
+dry-run and assembly must still pass. A newly failing or different block is a
+`regression`. Timeouts, cancellations, truncated output, signal termination,
+and failures without comparable evidence also fail closed. A pre-existing warning therefore scopes the pass to the
+selected library and produced AAR; it is not a whole-repository success claim.
+
+JSON reports retain the full bounded pre-migration command in
+`beforeUpgradeDryRun`. `verification.rootDryRun` contains the verdict, before
+and after statuses, SHA-256 fingerprints of normalized evidence, and bounded
+failure excerpts. Expected verdicts are `pass`, `improved`,
+`pre-existing-failure`, and `regression`.
+
 The repair engine is deterministic, not a bundled language model. Existing
-Conflicting Java targets, complex Kotlin compiler/source-set blocks, kapt/KSP
+conflicting Java targets, complex Kotlin compiler/source-set blocks, kapt/KSP
 decisions, convention-plugin internals, legacy Variant APIs, and ambiguous
 dynamic logic remain blockers or project-specific agent work. Over MCP, the
 structured blockers and bounded Gradle output let an external agent edit those
@@ -300,9 +319,16 @@ order and stops on the first failure:
 
 1. `help --no-daemon`
 2. `build --dry-run --no-daemon`
-3. `<library>:assemble<Variant> --no-daemon`, or
+3. `<library>:assemble<Variant> --dry-run --no-daemon`, or
+   `<library>:bundleAndroidMainAar --dry-run --no-daemon` for an AGP Kotlin
+   Multiplatform Android library
+4. `<library>:assemble<Variant> --no-daemon`, or
    `<library>:bundleAndroidMainAar --no-daemon` for an AGP Kotlin Multiplatform
    Android library
+
+Standalone `verify` has no pre-migration baseline command. Its whole-project
+dry-run therefore remains strict: any failure stops verification rather than
+being classified as pre-existing.
 
 The artifact inspector rejects symlinked/non-regular AARs, unsafe or duplicate
 ZIP paths, and bounded-size violations. It records entry and artifact SHA-256,

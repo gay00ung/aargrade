@@ -59,6 +59,7 @@ buildscript {
 
 AGP 9.3.1 적용 뒤 JDK 17에서 다음 결과를 확인했다.
 
+- `aargrade upgrade --target-agp 9.3.1 --library :sdk-core --baseline-aar ... --apply`: 통과
 - `./gradlew help --no-daemon`: 통과
 - `./gradlew :sdk-core:assembleRelease --dry-run --no-daemon`: 통과
 - `./gradlew :sdk-core:assembleRelease --no-daemon`: 통과
@@ -97,11 +98,12 @@ AGP 9.3.1 적용 뒤 JDK 17에서 다음 결과를 확인했다.
 따라서 이번 대상에서는 AGP 9.3.1로 다시 만든 AAR이 선언한 구형·최신
 Java/Kotlin 고객 환경에서 새 회귀를 만들지 않았다.
 
-## 저장소 전체 dry-run의 기존 실패
+## 저장소 전체 dry-run의 기존 실패 자동 분리
 
 `./gradlew build --dry-run`은 AGP 9.3.1 후보에서 실패했다. AARGrade의 자동
-`upgrade --apply`는 이 실패를 감지하고 소유한 변경을 즉시 원복했다.
-원본 AGP 9.2.1을 별도 worktree에서 실행해 보니 같은 오류가 재현됐다.
+`upgrade --apply` 첫 구현은 이 실패를 새 회귀로 간주해 소유한 변경을 즉시
+원복했다. 원본 AGP 9.2.1을 별도 worktree에서 실행해 보니 같은 오류가
+재현됐다.
 
 ```text
 Could not determine the dependencies of task
@@ -110,19 +112,44 @@ Task with name 'packageReleaseAssets' not found
 ```
 
 즉 이 오류는 마이그레이션 회귀가 아니라 릴리스 태그에 이미 존재하는 다른
-플러그인 모듈의 전체 `build` task 문제다. 그래서 이 기록은 **선택한 배포
-모듈과 AAR 고객 호환성이 통과했다**고만 결론 내리며, Adjust 저장소 전체
-빌드가 깨끗하다고 주장하지 않는다.
+플러그인 모듈의 전체 `build` task 문제다. 이 사례를 기준으로 AARGrade가
+적용 전에 전체 `build --dry-run`을 먼저 기록하고 적용 후 결과와 비교하도록
+구현했다. 정규화한 Gradle `What went wrong` 내용이 정확히 같을 때만 기존
+실패로 인정하며, 시간 초과·취소·내용 없는 실패와 서로 다른 오류는 계속
+회귀로 처리한다.
 
-이 사례는 다음 제품 개선 후보도 드러냈다. 전체 dry-run의 전체 오류를 보고서에
-보존하고, 마이그레이션 전에도 같은 실패가 있었는지 비교해 “기존 실패”와
-“후보 회귀”를 구분할 필요가 있다.
+개선 뒤 같은 고정 커밋에서 `upgrade --apply`를 처음부터 다시 실행한 결과는
+다음과 같았다.
+
+```text
+Pre-migration whole-project dry-run: FAIL (exit 1)
+[WARNING] gradle.root-dry-run — same failure before and after migration
+[PASS] gradle.commands — selected-library dry-run and AAR assembly succeeded
+AARGrade upgrade — PASS
+```
+
+적용 전·후 실패 fingerprint가 일치한 뒤에도
+`:sdk-core:assembleRelease --dry-run`, 실제 AAR 조립, Maven 기준 AAR과의
+JVM ABI·metadata·JNI 비교를
+모두 다시 통과해야 최종 `PASS`가 됐다. 후보 AAR SHA-256도 기존 실전 검증과
+같은 `69457f...fca61`이었다. 검증 후 AARGrade 소유 상태로 정확히 rollback해
+외부 worktree가 깨끗한 것도 확인했다.
+
+JSON 보고서의 적용 전·후 실패 fingerprint는 모두
+`e6a1625686baadb848caf8783e741ec11c10214532370e39292444743cb248ef`였고,
+적용 후 `gradle-dry-run`은 exit code 1을 숨기지 않은 채 `warning`으로
+기록됐다.
+
+따라서 이 기록은 **선택한 배포 모듈과 AAR 고객 호환성이 통과했다**고만
+결론 내리며, Adjust 저장소 전체 빌드가 깨끗하다고 주장하지 않는다.
 
 ## 재현 범위
 
 `make test-external`은 위 고정 커밋을 새 임시 디렉터리에 받아 `doctor`와
 AGP 9.3.1 변경 미리보기를 다시 확인한다. 전체 Maven AAR 비교와 네 소비자
 빌드는 JDK 11/17, Android SDK platform 30/37, 네트워크가 필요한 opt-in
-검증이므로 기본 CI에는 넣지 않았다.
+검증이므로 기본 CI에는 넣지 않았다. 적용 전·후 실패 비교 자체는 실제 Adjust
+재실행과 네 가지 독립 회귀 테스트(기존 실패, 새 실패, 다른 실패, 개선)로
+검증했다.
 
 외부 저장소에는 어떤 commit이나 push도 하지 않았다.

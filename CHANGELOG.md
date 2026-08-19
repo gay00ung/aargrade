@@ -5,6 +5,15 @@ Versioning while its public interfaces are still in beta.
 
 ## [Unreleased]
 
+### Added
+
+- Compare whole-project Gradle dry-run evidence before and after an applied
+  upgrade. An exactly matching pre-existing failure is retained as a warning
+  only after the selected library dry-run and AAR assembly pass; new,
+  different, timed-out, canceled, and unrecognized failures remain fatal.
+- Preserve pre-migration command evidence and normalized failure fingerprints
+  in structured upgrade and verification reports.
+
 ### Fixed
 
 - Resolve and migrate a single literal Groovy `buildscript.ext` AGP variable
@@ -16,6 +25,9 @@ Versioning while its public interfaces are still in beta.
 - Migrated the released Adjust Android SDK 5.8.0 source from AGP 9.2.1 to
   9.3.1, compared its rebuilt AAR with Maven Central, and passed AGP 4.2.2 and
   9.3.1 Java/Kotlin consumer builds.
+- Re-ran Adjust through one `upgrade --apply`: its identical pre-existing root
+  dry-run failure was isolated as a warning while `:sdk-core` dry-run, AAR
+  assembly, JVM ABI, metadata, R8, and JNI verification completed.
 
 ## [0.1.0-beta.1] - 2026-08-18
 
