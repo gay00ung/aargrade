@@ -1,7 +1,7 @@
 # 외부 Android 프로젝트 검증 기록 — 2026-08-18
 
 이 검증은 AARGrade가 자체 fixture에서만 동작하는지 확인하기 위해 공개 Android
-라이브러리 네 개의 고정 커밋을 사용했다. 수요 검증이나 모든 Gradle 구조에
+라이브러리·SDK 다섯 개의 고정 커밋을 사용했다. 수요 검증이나 모든 Gradle 구조에
 대한 호환성 보장이 아니라, 실제 저장소에서의 기술 검증이다.
 
 ## 고정 검증 대상
@@ -12,6 +12,7 @@
 | [Picasso](https://github.com/square/picasso) | `e94d6116e3fff99b3932103e0ab22ff5b44a1273` | AGP 8.7.2, Gradle 8.10.2, Groovy DSL | 9.3.1 변경 미리보기 | 준비 완료 |
 | [Lottie Android](https://github.com/airbnb/lottie-android) | `05ea92e90381eb8a8ae06855ea2b74f322bebbec` | RefreshVersions가 AGP 관리 | 진단·변경 미리보기 | 안전하게 중단 |
 | [Glide](https://github.com/bumptech/glide) | `bf4901de78c206ed21ce73f5d25aa2bbf35ebf3c` | AGP 9.2.0, Gradle 9.4.1, 대형 멀티모듈 | 9.3.1 실제 적용·Gradle·AAR 검사 | 통과 |
+| [Adjust Android SDK](https://github.com/adjust/android_sdk) | `b31ee274a2d189c4ff705c2ee6c47ad09ca5eb62` | AGP 9.2.1, Gradle 9.6.0, Groovy `buildscript.ext` | 9.3.1 미리보기와 별도 실전 AAR·매트릭스 검증 | 통과 |
 
 ## 실제 적용 결과
 
@@ -58,6 +59,7 @@
 4. 제한된 `libs.versions.*.get()` SDK/JVM target 변환
 5. KMP Android library의 `bundleAndroidMainAar` 태스크와 접미사 없는 AAR
    탐색
+6. 단일 literal Groovy `buildscript.ext` AGP 변수의 보수적 인식과 변경
 
 모든 수정에는 회귀 테스트가 추가됐다. 임의 함수 호출, 서로 다른 Java/Kotlin
 provider, RefreshVersions와 복잡한 convention logic은 계속 자동 변경하지
@@ -81,3 +83,5 @@ AARGRADE_EXTERNAL_APPLY=1 AARGRADE_KEEP_EXTERNAL=1 make test-external
 ```
 
 `AARGRADE_KEEP_EXTERNAL=1`은 종료 후 임시 작업 경로를 출력하고 보존한다.
+Adjust의 Maven 기준 AAR 비교와 네 고객 환경 결과는 별도의
+[실전 검증 기록](adjust-sdk-dogfood-2026-08-19.ko.md)에 정리했다.

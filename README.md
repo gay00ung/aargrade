@@ -236,6 +236,8 @@ aargrade migrate --project . --target-agp 9.2.0 --apply
 현재 자동 변경 범위는 다음과 같습니다.
 
 - Kotlin/Groovy의 literal AGP plugin과 `buildscript` classpath
+- AGP classpath에서만 참조되고 한 번만 literal로 선언된 Groovy
+  `buildscript.ext` 버전 변수
 - 기본 `gradle/libs.versions.toml`의 AGP version/ref
 - 목표 AGP가 요구하는 최소 Gradle Wrapper URL과 공식 SHA-256
 - 안전한 단일 줄 Kotlin Android plugin 제거와 AGP 9 Built-in Kotlin 전환
@@ -498,8 +500,12 @@ implicit BuildConfig, `kotlinOptions`가 남은 fixture를 `upgrade --apply` 한
 
 별도의 opt-in 외부 검증은 Timber와 Glide의 AGP 9 업그레이드를 실제 적용해
 Gradle/AAR 검사까지 통과했고, Picasso는 변경안을 생성했으며, Lottie의
-RefreshVersions 경계에서는 추측하지 않고 중단했습니다. 고정 커밋과 재현법은
+RefreshVersions 경계에서는 추측하지 않고 중단했습니다. Adjust Android SDK
+5.8.0은 Maven Central 기준 AAR과 비교하고 AGP 4.2.2/9.3.1의 Java/Kotlin 실제
+소비자 네 환경을 모두 통과했습니다. 고정 커밋과 재현법은
 [외부 프로젝트 검증 기록](docs/product/external-validation-2026-08.ko.md)에
+있고, Adjust 전체 결과는
+[Adjust SDK 실전 검증 기록](docs/product/adjust-sdk-dogfood-2026-08-19.ko.md)에
 있습니다.
 
 이 결과는 **설정한 네 환경의 빌드 증거**이지 모든 고객, 모든 API 호출,
@@ -513,6 +519,7 @@ RefreshVersions 경계에서는 추측하지 않고 중단했습니다. 고정 �
 - [제품 및 개발 계획](docs/product/plan.md)
 - [검증 기록](docs/product/validation.md)
 - [외부 프로젝트 실제 검증 기록 (한국어)](docs/product/external-validation-2026-08.ko.md)
+- [Adjust SDK 실전 검증 기록 (한국어)](docs/product/adjust-sdk-dogfood-2026-08-19.ko.md)
 - [Upgrade Assistant A/B 실제 결과 (한국어)](docs/product/upgrade-assistant-experiment.ko.md)
 - [Upgrade Assistant A/B evidence (English)](docs/product/upgrade-assistant-experiment.md)
 - [Consumer R8 테스트 설정 분석](R8_Configuration_Analysis.md)

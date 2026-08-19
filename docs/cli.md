@@ -181,6 +181,9 @@ The bounded mutation engine currently supports:
 
 - literal Kotlin/Groovy `com.android.*` plugin versions;
 - `com.android.tools.build:gradle` classpath coordinates;
+- one literal Groovy `buildscript.ext` variable whose string interpolations are
+  all AGP classpath coordinates; shared, reassigned, or dynamic variables stay
+  unresolved;
 - AGP entries and unshared `version.ref` keys in the default
   `gradle/libs.versions.toml` catalog;
 - a below-minimum Gradle Wrapper URL and its pinned official `bin`/`all`

@@ -1,6 +1,6 @@
 # AARGrade product and delivery plan
 
-## Implementation status (2026-08-18)
+## Implementation status (2026-08-19)
 
 - Milestone 1 is implemented: read-only diagnosis and ownership-safe host
   preview/apply/removal.
@@ -15,10 +15,12 @@
   repairs, migration, real Gradle/AAR verification, optional consumer cells,
   failure classification, and default rollback. A dedicated legacy-DSL fixture
   passes the complete AGP 8.8 → 9.2 lifecycle.
-- Pinned external validation now covers Timber, Picasso, Lottie, and Glide.
+- Pinned external validation now covers Timber, Picasso, Lottie, Glide, and
+  Adjust.
   Applied AGP 9.2.x → 9.3.1 runs passed Gradle and AAR verification for both a
   KMP Android library and a large classic multi-module library; a dynamic
-  RefreshVersions project stopped fail-closed.
+  RefreshVersions project stopped fail-closed. Adjust 5.8.0 passed a released
+  AAR comparison and four old/current Java/Kotlin consumer builds.
 - Milestone 3 is implemented and Gate D passed locally: the public AAR built in
   AGP 4.2.2 and 9.2.0 Java/Kotlin consumers with explicit JDK 11/17. CI is
   configured to repeat all four cells.
@@ -201,16 +203,18 @@ to handle those project-specific cases before rerunning the same operation.
   Studio build `AI-253.30387.90.2532.14901460` logged `Unable to obtain
   application's Android Project` and exposed no usable plan.
 - **Gate B — diagnostic usefulness (passed technically):** Timber, Picasso,
-  Lottie, and Glide trials classified useful, noisy, and unresolved findings
-  and led to concrete parser, migration, and KMP AAR verification corrections.
-  Two applied AGP 9 upgrades passed; external adoption remains open.
+  Lottie, Glide, and Adjust trials classified useful, noisy, and unresolved
+  findings and led to concrete parser, migration, and KMP AAR verification
+  corrections. Two full-project AGP 9 upgrades and Adjust's selected SDK module
+  passed; external adoption remains open.
 - **Gate C — host necessity (passed in the same environment):** `host add`
   changed the reproduced failure into an AGP 7.4.2 → 8.13.2 plan; exact removal
   restored settings and the failure state. See the
   [A/B evidence](upgrade-assistant-experiment.md).
 - **Gate D — matrix feasibility (passed technically):** AGP 4.2.2/9.2.0 ×
   Java/Kotlin passed with Gradle 6.7.1/9.4.1 and JDK 11/17. This is not external
-  adoption evidence.
+  adoption evidence. The same old/current four-cell shape also passed against
+  Adjust's released and rebuilt AARs using AGP 4.2.2/9.3.1.
 - **Gate E — integration demand (partially satisfied):** versioned JSON and CI
   exist and MCP was explicitly requested for this repository. Broader external
   demand remains unverified.

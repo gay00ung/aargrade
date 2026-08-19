@@ -172,10 +172,11 @@ aargrade migrate --project . --target-agp 9.2.0 --apply
 ```
 
 The current automatic surface covers literal Kotlin/Groovy AGP declarations,
-legacy `buildscript` classpaths, the default version catalog, the minimum
-compatible Gradle Wrapper URL plus official distribution checksum, standalone
-Kotlin Android plugin declarations for AGP 9 Built-in Kotlin, and obsolete AGP
-9 opt-out properties.
+legacy `buildscript` classpaths, one literal Groovy `buildscript.ext` version
+variable used only by the AGP classpath, the default version catalog, the
+minimum compatible Gradle Wrapper URL plus official distribution checksum,
+standalone Kotlin Android plugin declarations for AGP 9 Built-in Kotlin, and
+obsolete AGP 9 opt-out properties.
 
 It fails closed on missing namespaces, implicit custom BuildConfig fields,
 legacy Kotlin kapt unless migrated to `com.android.legacy-kapt`, KSP below
@@ -363,11 +364,13 @@ The agent smoke starts from missing namespace, implicit BuildConfig, legacy SDK
 setters, and `kotlinOptions`; one `upgrade --apply` repairs them, builds and
 inspects a real release AAR, then proves byte-exact rollback.
 
-An opt-in pinned external corpus also validates Timber, Picasso, Lottie, and
-Glide. Applied AGP 9 upgrades passed Gradle and AAR verification for Timber and
-Glide; Picasso produced a complete preview, while Lottie's RefreshVersions
-boundary stopped safely. See the
-[Korean evidence record](docs/product/external-validation-2026-08.ko.md).
+An opt-in pinned external corpus also validates Timber, Picasso, Lottie, Glide,
+and Adjust. Applied AGP 9 upgrades passed Gradle and AAR verification for
+Timber and Glide; Picasso produced a complete preview, while Lottie's
+RefreshVersions boundary stopped safely. Adjust 5.8.0 additionally passed a
+released-AAR comparison and AGP 4.2.2/9.3.1 Java/Kotlin consumer builds. See
+the [Korean corpus record](docs/product/external-validation-2026-08.ko.md) and
+the [Adjust dogfood record](docs/product/adjust-sdk-dogfood-2026-08-19.ko.md).
 
 ## Design and validation
 
@@ -377,6 +380,7 @@ boundary stopped safely. See the
 - [Product and delivery plan](docs/product/plan.md)
 - [Validation evidence](docs/product/validation.md)
 - [Pinned external-project evidence (Korean)](docs/product/external-validation-2026-08.ko.md)
+- [Adjust SDK dogfood evidence (Korean)](docs/product/adjust-sdk-dogfood-2026-08-19.ko.md)
 - [Upgrade Assistant A/B evidence](docs/product/upgrade-assistant-experiment.md)
 - [Upgrade Assistant A/B evidence (Korean)](docs/product/upgrade-assistant-experiment.ko.md)
 - [Consumer R8 fixture analysis](R8_Configuration_Analysis.md)

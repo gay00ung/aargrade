@@ -3,6 +3,20 @@
 Notable changes to AARGrade are recorded here. The project follows Semantic
 Versioning while its public interfaces are still in beta.
 
+## [Unreleased]
+
+### Fixed
+
+- Resolve and migrate a single literal Groovy `buildscript.ext` AGP variable
+  when every interpolation is confined to an AGP classpath coordinate. Shared,
+  reassigned, and dynamic variables remain fail-closed.
+
+### Validation
+
+- Migrated the released Adjust Android SDK 5.8.0 source from AGP 9.2.1 to
+  9.3.1, compared its rebuilt AAR with Maven Central, and passed AGP 4.2.2 and
+  9.3.1 Java/Kotlin consumer builds.
+
 ## [0.1.0-beta.1] - 2026-08-18
 
 ### Added
@@ -28,4 +42,5 @@ Versioning while its public interfaces are still in beta.
 - Keep RefreshVersions, arbitrary Gradle expressions, convention-plugin
   internals, legacy Variant APIs, and other ambiguous changes fail-closed.
 
+[Unreleased]: https://github.com/gay00ung/aargrade/compare/v0.1.0-beta.1...HEAD
 [0.1.0-beta.1]: https://github.com/gay00ung/aargrade/releases/tag/v0.1.0-beta.1

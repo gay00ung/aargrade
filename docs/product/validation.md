@@ -74,6 +74,7 @@ AGP 9:
 | [square/picasso](https://github.com/square/picasso) `e94d6116e3fff99b3932103e0ab22ff5b44a1273` | AGP 8.7.2 → 9.3.1 preview became ready across six Groovy Android modules. | Handle consecutive Groovy plugin lines and narrowly migrate matching `libs.versions.*.get()` SDK/JVM target expressions. |
 | [airbnb/lottie-android](https://github.com/airbnb/lottie-android) `05ea92e90381eb8a8ae06855ea2b74f322bebbec` | Diagnosis succeeded; upgrade stopped because RefreshVersions owns the effective AGP mapping. | Keep the dynamic-version boundary explicit and fail-closed instead of guessing. |
 | [bumptech/glide](https://github.com/bumptech/glide) `bf4901de78c206ed21ce73f5d25aa2bbf35ebf3c` | AGP 9.2.0 → 9.3.1 and Gradle 9.4.1 → 9.5.0 applied; large dry-run, release AAR assembly, and inspection passed. | Resolve catalog libraries declared with separate `group` and `name`; preserve existing AGP 9 Kotlin/KSP setup. |
+| [adjust/android_sdk](https://github.com/adjust/android_sdk) `b31ee274a2d189c4ff705c2ee6c47ad09ca5eb62` | Released 5.8.0 source migrated from AGP 9.2.1 → 9.3.1; selected SDK AAR, baseline comparison, and four consumer cells passed. | Resolve a single literal Groovy `buildscript.ext` AGP variable while keeping shared and dynamic variables fail-closed. |
 
 The Timber AAR was 32,705 bytes with SHA-256
 `3270214ff2784195326b0a67da50404f7cb36291e30b50690e6cb0dba38d19f1`.
@@ -84,6 +85,17 @@ successful runs finished with hash-checked migration acceptance. The pinned
 protocol is executable through `make test-external`, with applied Gradle work
 requiring explicit `AARGRADE_EXTERNAL_APPLY=1`. See the
 [Korean detailed record](external-validation-2026-08.ko.md).
+
+The Adjust baseline AAR from Maven Central had SHA-256
+`d00ddde91b0bfe46fb7c5675fa5a52fe3393e990a334f14804b01c2e4f0affea`;
+the AGP 9.3.1 rebuild had SHA-256
+`69457f6f2b09c8d9daeda7a3432ef7c78ef3ad2576764d9e84e3b6f6d75fca61`.
+Both passed AGP 4.2.2/Gradle 6.7.1/JDK 11 and AGP 9.3.1/Gradle 9.5.0/JDK 17
+Java/Kotlin release consumers. The repository-wide dry-run failed identically
+before and after migration because an unrelated plugin task references missing
+`packageReleaseAssets`; therefore the record claims selected SDK compatibility,
+not a clean whole-repository build. See the
+[Adjust dogfood record](adjust-sdk-dogfood-2026-08-19.ko.md).
 
 These trials validate useful structural coverage across Kotlin DSL, Groovy DSL,
 KMP Android, version catalogs, classic buildscript classpaths, Android test
