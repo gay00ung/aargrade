@@ -27,26 +27,15 @@ func Run(options Options) (Report, error) {
 		},
 	}
 
-	mutation, err := migration.Migrate(migration.MutationOptions{
+	migrationOptions := migration.MutationOptions{
 		ProjectPath:        options.ProjectPath,
 		TargetAGP:          options.TargetAGP,
 		CurrentAGPOverride: options.CurrentAGPOverride,
 		ToolVersion:        options.ToolVersion,
-		Apply:              options.Apply,
 		AutoRepair:         true,
-	})
+	}
+	mutation, err := migration.Migrate(migrationOptions)
 	if err != nil {
-		if mutation.TransactionStarted {
-			report.ProjectRoot = mutation.ProjectRoot
-			report.Migration = mutation
-			report.Applied = true
-			report.Verdict = "incomplete"
-			report.Failure = analyzeFailure("migration-apply", err)
-			if rollbackErr := rollbackFailedUpgrade(&report, options); rollbackErr != nil {
-				return report, rollbackErr
-			}
-			return report, nil
-		}
 		return Report{}, err
 	}
 	report.ProjectRoot = mutation.ProjectRoot
@@ -63,17 +52,63 @@ func Run(options Options) (Report, error) {
 		report.Verdict = "preview"
 		return report, nil
 	}
-	report.Applied = true
 
-	verificationReport, verifyErr := verification.Run(verification.Options{
+	beforeUpgradeDryRun, err := verification.RunRootDryRun(verification.Options{
 		Context:     options.Context,
 		ProjectPath: mutation.ProjectRoot,
-		LibraryPath: options.LibraryPath,
-		Variant:     options.Variant,
-		BaselineAAR: options.BaselineAAR,
 		GradleArgs:  options.GradleArgs,
 		Timeout:     options.Timeout,
 		ToolVersion: options.ToolVersion,
+	})
+	if err != nil {
+		report.Verdict = "incomplete"
+		report.Failure = analyzeFailure("gradle-dry-run-before", err)
+		return report, nil
+	}
+	report.BeforeUpgradeDryRun = &beforeUpgradeDryRun
+	if options.Context != nil && options.Context.Err() != nil {
+		report.Verdict = "incomplete"
+		report.Failure = analyzeFailure("gradle-dry-run-before", options.Context.Err())
+		return report, nil
+	}
+
+	migrationOptions.Apply = true
+	mutation, err = migration.Migrate(migrationOptions)
+	if mutation.ProjectRoot != "" {
+		report.ProjectRoot = mutation.ProjectRoot
+		report.Migration = mutation
+	}
+	if err != nil {
+		report.Verdict = "incomplete"
+		report.Failure = analyzeFailure("migration-apply", err)
+		if mutation.TransactionStarted {
+			report.Applied = true
+			if rollbackErr := rollbackFailedUpgrade(&report, options); rollbackErr != nil {
+				return report, rollbackErr
+			}
+		}
+		return report, nil
+	}
+	if !mutation.Ready {
+		report.Verdict = "blocked"
+		report.Failure = &FailureAnalysis{
+			Category: "static-analysis", Summary: "사전 검증 이후 프로젝트가 달라져 자동 마이그레이션을 적용할 수 없습니다.",
+			SuggestedAction: "blockers를 확인하고 upgrade를 다시 실행하세요.",
+		}
+		return report, nil
+	}
+	report.Applied = mutation.Applied
+
+	verificationReport, verifyErr := verification.Run(verification.Options{
+		Context:             options.Context,
+		ProjectPath:         mutation.ProjectRoot,
+		LibraryPath:         options.LibraryPath,
+		Variant:             options.Variant,
+		BaselineAAR:         options.BaselineAAR,
+		GradleArgs:          options.GradleArgs,
+		BeforeUpgradeDryRun: &beforeUpgradeDryRun,
+		Timeout:             options.Timeout,
+		ToolVersion:         options.ToolVersion,
 	})
 	if verifyErr != nil {
 		report.Verdict = "incomplete"
@@ -221,6 +256,9 @@ func analyzeFailure(command string, failure error) *FailureAnalysis {
 	case strings.Contains(lower, "could not resolve") || strings.Contains(lower, "unknownhost") || strings.Contains(lower, "network"):
 		analysis.Category = "dependency-resolution"
 		analysis.SuggestedAction = "네트워크·저장소·프록시와 dependency version을 확인한 뒤 재시도하세요."
+	case strings.Contains(lower, "task with name") && strings.Contains(lower, "not found"):
+		analysis.Category = "gradle-task"
+		analysis.SuggestedAction = "실패한 task 의존성이 현재 AGP에서 존재하는지 확인하고 public task/artifact API로 전환하세요."
 	}
 	if analysis.Summary == "" {
 		analysis.Summary = "Gradle 검증을 완료하지 못했습니다."
@@ -236,7 +274,9 @@ func firstFailureLine(message string) string {
 			strings.Contains(lower, "inconsistent jvm targets") ||
 			strings.Contains(lower, "buildconfig") && strings.Contains(lower, "disabled") ||
 			strings.Contains(lower, "sdk location not found") ||
-			strings.Contains(lower, "could not resolve") {
+			strings.Contains(lower, "could not resolve") ||
+			strings.Contains(lower, "could not determine the dependencies") ||
+			strings.Contains(lower, "task with name") && strings.Contains(lower, "not found") {
 			return truncateFailureLine(line)
 		}
 	}

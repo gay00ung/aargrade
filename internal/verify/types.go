@@ -36,6 +36,17 @@ type Command struct {
 	Output     string   `json:"output,omitempty"`
 }
 
+type RootDryRunComparison struct {
+	Verdict           string `json:"verdict"`
+	Summary           string `json:"summary"`
+	BeforeStatus      Status `json:"beforeStatus"`
+	AfterStatus       Status `json:"afterStatus"`
+	BeforeFingerprint string `json:"beforeFingerprint,omitempty"`
+	AfterFingerprint  string `json:"afterFingerprint,omitempty"`
+	BeforeFailure     string `json:"beforeFailure,omitempty"`
+	AfterFailure      string `json:"afterFailure,omitempty"`
+}
+
 type Report struct {
 	SchemaVersion int                     `json:"schemaVersion"`
 	ToolVersion   string                  `json:"toolVersion"`
@@ -47,18 +58,20 @@ type Report struct {
 	Baseline      *artifact.Snapshot      `json:"baseline,omitempty"`
 	ABI           *artifact.ABIComparison `json:"abi,omitempty"`
 	Commands      []Command               `json:"commands,omitempty"`
+	RootDryRun    *RootDryRunComparison   `json:"rootDryRun,omitempty"`
 	Checks        []Check                 `json:"checks"`
 	Limitations   []string                `json:"limitations,omitempty"`
 }
 
 type Options struct {
-	Context      context.Context
-	ProjectPath  string
-	LibraryPath  string
-	Variant      string
-	CandidateAAR string
-	BaselineAAR  string
-	GradleArgs   []string
-	Timeout      time.Duration
-	ToolVersion  string
+	Context             context.Context
+	ProjectPath         string
+	LibraryPath         string
+	Variant             string
+	CandidateAAR        string
+	BaselineAAR         string
+	GradleArgs          []string
+	BeforeUpgradeDryRun *Command
+	Timeout             time.Duration
+	ToolVersion         string
 }

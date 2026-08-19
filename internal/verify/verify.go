@@ -34,13 +34,20 @@ func Run(options Options) (Report, error) {
 		result.ProjectRoot = build.projectRoot
 		result.LibraryModule = build.libraryModule
 		result.Commands = build.commands
+		result.RootDryRun = build.rootDryRun
 		if build.failed {
 			result.Verdict = "fail"
 			result.Checks = append(result.Checks, Check{ID: "gradle.commands", Status: StatusFail, Summary: "Gradle verification command failed", Details: failedCommandDetails(build.commands)})
+			if build.rootDryRun != nil {
+				result.Checks = append(result.Checks, rootDryRunCheck(*build.rootDryRun))
+			}
 			return result, nil
 		}
 		candidatePath = build.aarPath
-		result.Checks = append(result.Checks, Check{ID: "gradle.commands", Status: StatusPass, Summary: "Gradle help, dry-run, and AAR assembly succeeded"})
+		result.Checks = append(result.Checks, Check{ID: "gradle.commands", Status: StatusPass, Summary: "Gradle help, selected-library dry-run, and AAR assembly succeeded"})
+		if build.rootDryRun != nil {
+			result.Checks = append(result.Checks, rootDryRunCheck(*build.rootDryRun))
+		}
 	} else {
 		result.Checks = append(result.Checks, Check{ID: "gradle.commands", Status: StatusSkipped, Summary: "Candidate AAR was supplied; project build commands were not run"})
 	}
@@ -84,6 +91,23 @@ func Run(options Options) (Report, error) {
 		result.Verdict = "pass"
 	}
 	return result, nil
+}
+
+func rootDryRunCheck(comparison RootDryRunComparison) Check {
+	check := Check{ID: "gradle.root-dry-run", Status: StatusPass, Summary: comparison.Summary}
+	if comparison.Verdict == rootDryRunPreExisting {
+		check.Status = StatusWarning
+	}
+	if comparison.Verdict == rootDryRunRegression {
+		check.Status = StatusFail
+	}
+	if comparison.BeforeFailure != "" {
+		check.Details = append(check.Details, "before: "+strings.ReplaceAll(comparison.BeforeFailure, "\n", " | "))
+	}
+	if comparison.AfterFailure != "" && comparison.AfterFailure != comparison.BeforeFailure {
+		check.Details = append(check.Details, "after: "+strings.ReplaceAll(comparison.AfterFailure, "\n", " | "))
+	}
+	return check
 }
 
 func candidateChecks(snapshot artifact.Snapshot) []Check {

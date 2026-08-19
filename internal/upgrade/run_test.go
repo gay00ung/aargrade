@@ -1,6 +1,8 @@
 package upgrade
 
 import (
+	"archive/zip"
+	"bytes"
 	"errors"
 	"io/fs"
 	"os"
@@ -57,6 +59,7 @@ func TestUpgradePartialMigrationWriteIsRolledBack(t *testing.T) {
 	}
 	root := copyNamedUpgradeFixture(t, "upgrade-agent")
 	before := upgradeSnapshot(t, root)
+	writePassingWrapper(t, root)
 	manifestDirectory := filepath.Join(root, "sdk", "src", "main")
 	if err := os.Chmod(manifestDirectory, 0o555); err != nil {
 		t.Fatal(err)
@@ -76,6 +79,107 @@ func TestUpgradePartialMigrationWriteIsRolledBack(t *testing.T) {
 	}
 	if after := upgradeSnapshot(t, root); !reflect.DeepEqual(after, before) {
 		t.Fatalf("partial migration write was not restored\nbefore=%v\nafter=%v", before, after)
+	}
+}
+
+func TestUpgradeAcceptsEquivalentPreExistingRootDryRunFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell scenario wrapper is covered by platform-independent comparison tests")
+	}
+	root := copyUpgradeFixture(t)
+	writeCandidateAAR(t, root)
+	writeDryRunScenarioWrapper(t, root, "pre-existing")
+
+	report, err := Run(Options{
+		ProjectPath: root, TargetAGP: "9.2.0", ToolVersion: "test",
+		Apply: true, RollbackOnFailure: true, Timeout: 10 * time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Verdict != "pass" || !report.Applied || report.RolledBack || report.BeforeUpgradeDryRun == nil || report.BeforeUpgradeDryRun.Status != "fail" {
+		t.Fatalf("upgrade report = %#v", report)
+	}
+	if report.Verification == nil || report.Verification.RootDryRun == nil || report.Verification.RootDryRun.Verdict != "pre-existing-failure" {
+		t.Fatalf("root dry-run comparison = %#v", report.Verification)
+	}
+	if statusForUpgradeCheck(report, "gradle.root-dry-run") != "warning" || statusForUpgradeCommand(report, "aar-dry-run") != "pass" {
+		t.Fatalf("verification evidence = %#v", report.Verification)
+	}
+}
+
+func TestUpgradeRollsBackNewOrDifferentRootDryRunFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell scenario wrapper is covered by platform-independent comparison tests")
+	}
+	for _, scenario := range []string{"new-failure", "different-failure"} {
+		t.Run(scenario, func(t *testing.T) {
+			root := copyUpgradeFixture(t)
+			writeCandidateAAR(t, root)
+			writeDryRunScenarioWrapper(t, root, scenario)
+			before := upgradeSnapshot(t, root)
+
+			report, err := Run(Options{
+				ProjectPath: root, TargetAGP: "9.2.0", ToolVersion: "test",
+				Apply: true, RollbackOnFailure: true, Timeout: 10 * time.Second,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if report.Verdict != "fail" || !report.RolledBack || report.Verification == nil || report.Verification.RootDryRun == nil || report.Verification.RootDryRun.Verdict != "regression" {
+				t.Fatalf("upgrade report = %#v", report)
+			}
+			if after := upgradeSnapshot(t, root); !reflect.DeepEqual(after, before) {
+				t.Fatalf("regression did not restore configuration\nbefore=%v\nafter=%v", before, after)
+			}
+		})
+	}
+}
+
+func TestUpgradeRecordsImprovedRootDryRun(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell scenario wrapper is covered by platform-independent comparison tests")
+	}
+	root := copyUpgradeFixture(t)
+	writeCandidateAAR(t, root)
+	writeDryRunScenarioWrapper(t, root, "improved")
+
+	report, err := Run(Options{
+		ProjectPath: root, TargetAGP: "9.2.0", ToolVersion: "test",
+		Apply: true, RollbackOnFailure: true, Timeout: 10 * time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Verdict != "pass" || report.Verification == nil || report.Verification.RootDryRun == nil || report.Verification.RootDryRun.Verdict != "improved" {
+		t.Fatalf("upgrade report = %#v", report)
+	}
+}
+
+func TestUpgradeRollsBackSelectedLibraryFailureAfterPreExistingRootFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell scenario wrapper is covered by platform-independent comparison tests")
+	}
+	root := copyUpgradeFixture(t)
+	writeCandidateAAR(t, root)
+	writeDryRunScenarioWrapper(t, root, "pre-existing-module-failure")
+	before := upgradeSnapshot(t, root)
+
+	report, err := Run(Options{
+		ProjectPath: root, TargetAGP: "9.2.0", ToolVersion: "test",
+		Apply: true, RollbackOnFailure: true, Timeout: 10 * time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Verdict != "fail" || !report.RolledBack || report.Verification == nil || report.Verification.RootDryRun == nil || report.Verification.RootDryRun.Verdict != "pre-existing-failure" {
+		t.Fatalf("upgrade report = %#v", report)
+	}
+	if statusForUpgradeCommand(report, "gradle-dry-run") != "warning" || statusForUpgradeCommand(report, "aar-dry-run") != "fail" {
+		t.Fatalf("command evidence = %#v", report.Verification.Commands)
+	}
+	if after := upgradeSnapshot(t, root); !reflect.DeepEqual(after, before) {
+		t.Fatalf("selected-library failure did not restore configuration\nbefore=%v\nafter=%v", before, after)
 	}
 }
 
@@ -153,6 +257,130 @@ func writeFailingWrapper(t *testing.T, root string) {
 			t.Fatal(err)
 		}
 	}
+}
+
+func writePassingWrapper(t *testing.T, root string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(root, "gradlew"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "gradlew.bat"), []byte("@echo off\r\nexit /b 0\r\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeDryRunScenarioWrapper(t *testing.T, root, scenario string) {
+	t.Helper()
+	failExisting := `printf '%s\n' 'FAILURE: Build failed with an exception.' '* What went wrong:' "Could not determine the dependencies of task ':plugins:sdk-plugin-google-lvl:adjustLvlPluginJar'." "> Task with name 'packageReleaseAssets' not found in project ':plugins:sdk-plugin-google-lvl'." '* Try:' 'Run with --stacktrace option.' >&2
+exit 1
+`
+	failExistingAfter := `printf '%s\n' 'Starting a Gradle Daemon' 'FAILURE: Build failed with an exception.' '* What went wrong:' "  Could not   determine the dependencies of task ':plugins:sdk-plugin-google-lvl:adjustLvlPluginJar'." "> Task with name 'packageReleaseAssets' not found in project ':plugins:sdk-plugin-google-lvl'." '* Try:' 'Run with --info option.' >&2
+exit 1
+`
+	failDifferent := `printf '%s\n' 'FAILURE: Build failed with an exception.' '* What went wrong:' 'Namespace not specified. Specify a namespace.' '* Try:' 'Run with --stacktrace option.' >&2
+exit 1
+`
+	pass := "exit 0\n"
+	before, after, moduleDryRun := pass, pass, pass
+	switch scenario {
+	case "pre-existing":
+		before, after = failExisting, failExistingAfter
+	case "pre-existing-module-failure":
+		before, after, moduleDryRun = failExisting, failExistingAfter, failDifferent
+	case "new-failure":
+		after = failExisting
+	case "different-failure":
+		before, after = failExisting, failDifferent
+	case "improved":
+		before = failExisting
+	default:
+		t.Fatalf("unknown dry-run scenario %q", scenario)
+	}
+	script := `#!/bin/sh
+args="$*"
+case "$args" in
+  help*)
+    exit 0
+    ;;
+  "build --dry-run --no-daemon"*)
+    if grep -q 'agp = "9.2.0"' gradle/libs.versions.toml; then
+` + after + `    else
+` + before + `    fi
+    ;;
+  ":sdk:assembleRelease --dry-run --no-daemon"*)
+` + moduleDryRun + `
+    ;;
+  ":sdk:assembleRelease --no-daemon"*)
+    exit 0
+    ;;
+esac
+printf '%s\n' "unexpected arguments: $args" >&2
+exit 9
+`
+	if err := os.WriteFile(filepath.Join(root, "gradlew"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeCandidateAAR(t *testing.T, root string) {
+	t.Helper()
+	var classes bytes.Buffer
+	classesWriter := zip.NewWriter(&classes)
+	if err := classesWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, "sdk", "build", "outputs", "aar", "sdk-release.aar")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := zip.NewWriter(file)
+	for name, content := range map[string][]byte{
+		"AndroidManifest.xml": []byte("<manifest />"),
+		"classes.jar":         classes.Bytes(),
+		"META-INF/com/android/build/gradle/aar-metadata.properties": []byte("aarFormatVersion=1.0\n"),
+	} {
+		entry, createErr := writer.Create(name)
+		if createErr != nil {
+			t.Fatal(createErr)
+		}
+		if _, writeErr := entry.Write(content); writeErr != nil {
+			t.Fatal(writeErr)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func statusForUpgradeCheck(report Report, id string) string {
+	if report.Verification == nil {
+		return ""
+	}
+	for _, check := range report.Verification.Checks {
+		if check.ID == id {
+			return string(check.Status)
+		}
+	}
+	return ""
+}
+
+func statusForUpgradeCommand(report Report, name string) string {
+	if report.Verification == nil {
+		return ""
+	}
+	for _, command := range report.Verification.Commands {
+		if command.Name == name {
+			return string(command.Status)
+		}
+	}
+	return ""
 }
 
 func upgradeSnapshot(t *testing.T, root string) []string {

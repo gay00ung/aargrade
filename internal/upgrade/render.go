@@ -40,6 +40,11 @@ func RenderText(writer io.Writer, report Report) error {
 			return err
 		}
 	}
+	if report.BeforeUpgradeDryRun != nil {
+		if _, err := fmt.Fprintf(writer, "\nPre-migration whole-project dry-run: %s (exit %d)\n", strings.ToUpper(string(report.BeforeUpgradeDryRun.Status)), report.BeforeUpgradeDryRun.ExitCode); err != nil {
+			return err
+		}
+	}
 	if report.Verification != nil {
 		if _, err := fmt.Fprintln(writer, "\nProject and AAR verification:"); err != nil {
 			return err

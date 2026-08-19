@@ -19,19 +19,20 @@ type FailureAnalysis struct {
 }
 
 type Report struct {
-	SchemaVersion int                       `json:"schemaVersion"`
-	ToolVersion   string                    `json:"toolVersion,omitempty"`
-	ProjectRoot   string                    `json:"projectRoot,omitempty"`
-	TargetAGP     string                    `json:"targetAgp"`
-	Verdict       string                    `json:"verdict"`
-	Applied       bool                      `json:"applied"`
-	RolledBack    bool                      `json:"rolledBack"`
-	Migration     migration.MutationResult  `json:"migration"`
-	Verification  *verification.Report      `json:"verification,omitempty"`
-	Matrix        *consumer.Report          `json:"matrix,omitempty"`
-	Failure       *FailureAnalysis          `json:"failure,omitempty"`
-	Rollback      *migration.MutationResult `json:"rollback,omitempty"`
-	Limitations   []string                  `json:"limitations,omitempty"`
+	SchemaVersion       int                       `json:"schemaVersion"`
+	ToolVersion         string                    `json:"toolVersion,omitempty"`
+	ProjectRoot         string                    `json:"projectRoot,omitempty"`
+	TargetAGP           string                    `json:"targetAgp"`
+	Verdict             string                    `json:"verdict"`
+	Applied             bool                      `json:"applied"`
+	RolledBack          bool                      `json:"rolledBack"`
+	Migration           migration.MutationResult  `json:"migration"`
+	BeforeUpgradeDryRun *verification.Command     `json:"beforeUpgradeDryRun,omitempty"`
+	Verification        *verification.Report      `json:"verification,omitempty"`
+	Matrix              *consumer.Report          `json:"matrix,omitempty"`
+	Failure             *FailureAnalysis          `json:"failure,omitempty"`
+	Rollback            *migration.MutationResult `json:"rollback,omitempty"`
+	Limitations         []string                  `json:"limitations,omitempty"`
 }
 
 type Options struct {
