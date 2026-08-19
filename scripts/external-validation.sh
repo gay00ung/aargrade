@@ -50,6 +50,7 @@ clone_at timber https://github.com/JakeWharton/timber.git c51c0cad85bfd4c4c45222
 clone_at picasso https://github.com/square/picasso.git e94d6116e3fff99b3932103e0ab22ff5b44a1273
 clone_at lottie https://github.com/airbnb/lottie-android.git 05ea92e90381eb8a8ae06855ea2b74f322bebbec
 clone_at glide https://github.com/bumptech/glide.git bf4901de78c206ed21ce73f5d25aa2bbf35ebf3c
+clone_at adjust https://github.com/adjust/android_sdk.git b31ee274a2d189c4ff705c2ee6c47ad09ca5eb62
 
 for project_name in timber picasso lottie glide; do
   printf '\n== doctor: %s ==\n' "${project_name}"
@@ -57,6 +58,11 @@ for project_name in timber picasso lottie glide; do
     --project "${validation_root}/${project_name}" \
     --fail-on never
 done
+
+printf '\n== doctor: adjust ==\n'
+"${binary}" doctor \
+  --project "${validation_root}/adjust/Adjust" \
+  --fail-on never
 
 printf '\n== upgrade preview: Timber AGP 9.2.1 -> 9.3.1 ==\n'
 "${binary}" upgrade \
@@ -90,6 +96,12 @@ printf '\n== upgrade preview: Glide AGP 9.2.0 -> 9.3.1 ==\n'
   --project "${validation_root}/glide" \
   --target-agp 9.3.1 \
   --library :library
+
+printf '\n== upgrade preview: Adjust AGP 9.2.1 -> 9.3.1 ==\n'
+"${binary}" upgrade \
+  --project "${validation_root}/adjust/Adjust" \
+  --target-agp 9.3.1 \
+  --library :sdk-core
 
 if [[ "${AARGRADE_EXTERNAL_APPLY:-0}" == 1 ]]; then
   printf '\n== applied verification: Timber ==\n'
