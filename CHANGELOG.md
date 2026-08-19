@@ -5,6 +5,12 @@ Versioning while its public interfaces are still in beta.
 
 ## [Unreleased]
 
+### Added
+
+- Added Korean and English external-beta runbooks plus structured GitHub forms
+  for real SDK maintainers to report sanitized apply/rollback and consumer
+  matrix evidence toward the v1 graduation gate.
+
 ## [0.1.0-beta.2] - 2026-08-19
 
 ### Added

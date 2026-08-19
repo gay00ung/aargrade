@@ -1,0 +1,125 @@
+name: "🧪 베타 실전 검증 / Beta validation"
+description: "실제 Android SDK 또는 AAR 프로젝트에서 AARGrade를 실행한 결과를 공유합니다."
+title: "[Validation] "
+labels:
+  - "beta-validation"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        참여해 주셔서 감사합니다. 먼저 [한국어 베타 검증 가이드](https://github.com/gay00ung/aargrade/blob/main/docs/beta-testing.ko.md) 또는 [English guide](https://github.com/gay00ung/aargrade/blob/main/docs/beta-testing.md)를 읽어 주세요.
+
+        고객 코드, 저장소 URL, 토큰, 서명 정보, 사내 경로는 공개하지 않아도 됩니다. 출력이나 첨부 파일은 반드시 직접 검토하고 민감정보를 제거해 주세요.
+
+  - type: dropdown
+    id: relationship
+    attributes:
+      label: 프로젝트와의 관계 / Relationship
+      description: 이 답변은 v1 외부 관리자 검증을 구분하는 데 사용됩니다.
+      options:
+        - "관리자 또는 기여자 / Maintainer or contributor"
+        - "조직의 허가를 받아 평가 중 / Evaluating with organizational permission"
+        - "관계없는 공개 프로젝트를 독립적으로 시험 / Independent public-project trial"
+    validations:
+      required: true
+
+  - type: input
+    id: project
+    attributes:
+      label: 프로젝트 / Project
+      description: 공개 저장소 URL이나 익명 설명을 적어 주세요. 비공개 고객 이름은 쓰지 마세요.
+      placeholder: "예: 공개 결제 SDK URL 또는 비공개 멀티모듈 인증 SDK"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: project_shape
+    attributes:
+      label: 프로젝트 형태 / Project shape
+      options:
+        - "단일 Android library 모듈 / Single Android library"
+        - "멀티모듈 Android SDK / Multi-module Android SDK"
+        - "Kotlin Multiplatform Android library"
+        - "Android Gradle Plugin 또는 build logic"
+        - "기타 / Other"
+    validations:
+      required: true
+
+  - type: input
+    id: aargrade_version
+    attributes:
+      label: AARGrade 버전
+      description: "aargrade version 출력 전체를 적어 주세요."
+      placeholder: "aargrade v0.1.0-beta.2"
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 빌드 환경 / Environment
+      description: OS, 현재/목표 AGP, Gradle, JDK, Kotlin/KSP 정보를 가능한 범위에서 적어 주세요.
+      placeholder: |
+        OS: macOS 15 arm64
+        AGP: 8.8.2 -> 9.3.1
+        Gradle: 8.10.2 -> 9.5.0
+        JDK: 17
+        DSL: Kotlin DSL
+    validations:
+      required: true
+
+  - type: dropdown
+    id: commands
+    attributes:
+      label: 실행한 흐름 / Executed workflow
+      multiple: true
+      options:
+        - "doctor"
+        - "upgrade 미리보기 / preview"
+        - "upgrade --apply"
+        - "migrate rollback"
+        - "verify"
+        - "matrix"
+        - "host add/remove"
+        - "mcp serve"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: result
+    attributes:
+      label: 결과 / Result
+      options:
+        - "통과했고 증거가 생성됨 / Passed with evidence"
+        - "지원하지 않는 구조에서 안전하게 중단 / Safely blocked"
+        - "실패 후 자동 또는 명시적 롤백 성공 / Failed and rolled back safely"
+        - "예상하지 못한 실패 / Unexpected failure"
+        - "호환성 문제를 놓친 것으로 의심 / Suspected false pass"
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: 결과 요약 / Result summary
+      description: 무엇이 잘 됐고, 어디서 막혔으며, 기대한 다음 행동이 무엇인지 적어 주세요.
+    validations:
+      required: true
+
+  - type: textarea
+    id: sanitized_evidence
+    attributes:
+      label: 검토한 증거 / Reviewed evidence
+      description: 민감정보를 제거한 핵심 finding, blocker, verdict 또는 로그만 붙여 주세요. 파일 첨부도 가능합니다.
+
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: 공개 안전 확인 / Publication safety
+      options:
+        - label: "이 프로젝트를 시험할 권한이 있습니다. / I am authorized to test this project."
+          required: true
+        - label: "출력과 첨부 파일을 직접 검토했고 비밀·고객 코드·사내 경로를 제거했습니다. / I reviewed and sanitized all shared evidence."
+          required: true
+        - label: "필요하면 추가 질문에 답할 수 있습니다. / I can answer follow-up questions when possible."
+          required: false

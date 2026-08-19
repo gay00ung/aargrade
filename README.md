@@ -58,6 +58,23 @@ Variant API, convention plugin 내부처럼 프로젝트별 판단이 필요한 
 증명하지는 않습니다. 그래서 마지막에 실제 고객 프로젝트를 빌드하는
 `matrix`가 필요합니다.
 
+## v1 베타 검증 참여
+
+`v1.0.0` 전에 실제 Android SDK/AAR 관리자 3명 이상의 적용·복원 또는 고객
+빌드 결과를 확인하려고 합니다. 비공개 프로젝트도 소스나 고객 이름을 공개하지
+않고 참여할 수 있습니다.
+
+- 먼저 변경 없는 `doctor`와 `upgrade` 미리보기만 실행할 수 있습니다.
+- 더 깊은 검증은 깨끗한 브랜치에서 `--apply` 후 rollback을 확인하거나
+  `matrix`로 실제 Java/Kotlin 고객 앱을 빌드합니다.
+- 공개할 결과는 반드시 직접 검토해 토큰, 고객 코드와 사내 경로를 제거합니다.
+
+[한국어 베타 검증 가이드](docs/beta-testing.ko.md)를 따라 실행한 뒤
+[구조화된 검증 양식](https://github.com/gay00ung/aargrade/issues/new?template=beta-validation.yml)에
+결과를 알려주세요. 예상하지 못한 실패는
+[버그 신고 양식](https://github.com/gay00ung/aargrade/issues/new?template=bug-report.yml)을
+사용하면 됩니다.
+
 ## 1분 체험
 
 Git과 Go 1.25 이상만 있으면 됩니다. 이 읽기 전용 데모에는 Android Studio나

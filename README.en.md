@@ -45,6 +45,23 @@ The built-in verifier reads the public/protected JVM linkage surface. It does
 not prove complete Java/Kotlin source compatibility or native runtime behavior;
 the real consumer builds are intentionally a separate final layer.
 
+## Help validate v1
+
+Before `v1.0.0`, we want apply/restore or consumer-build evidence from at least
+three real Android SDK/AAR maintainers. Private projects can participate without
+disclosing source code or customer names.
+
+- Start with read-only `doctor` and `upgrade` previews.
+- For deeper validation, test `--apply` and rollback in a clean branch, or build
+  real Java/Kotlin consumers with `matrix`.
+- Review every shared result and remove tokens, customer code, and internal
+  paths.
+
+Follow the [external beta guide](docs/beta-testing.md), then submit the
+[structured validation form](https://github.com/gay00ung/aargrade/issues/new?template=beta-validation.yml).
+Use the [bug form](https://github.com/gay00ung/aargrade/issues/new?template=bug-report.yml)
+for unexpected behavior.
+
 ## Try it in one minute
 
 The read-only demo needs Git and Go 1.25 or newer, but not Android Studio or the

@@ -47,6 +47,15 @@ make test-upgrade-agent-smoke
 5. JSON 스키마와 종료 코드가 바뀌면 `docs/cli.md`와 README도 갱신합니다.
 6. 로그·fixture·이슈에 토큰, 비밀번호, 서명 키, 고객 경로를 넣지 않습니다.
 
+## 외부 베타 검증
+
+코드 변경 없이 실제 Android SDK에서 AARGrade를 시험한 결과도 중요한
+기여입니다. [한국어 베타 검증 가이드](docs/beta-testing.ko.md)의 안전 절차를
+따르고, 결과는
+[베타 실전 검증 양식](https://github.com/gay00ung/aargrade/issues/new?template=beta-validation.yml)으로
+제출해 주세요. 비공개 프로젝트는 익명 설명만으로 참여할 수 있으며 소스나
+고객 이름을 공개할 필요가 없습니다.
+
 ## 이슈와 Pull Request
 
 버그를 제보할 때는 가능한 범위에서 AARGrade 버전, 운영체제, JDK, 현재/목표

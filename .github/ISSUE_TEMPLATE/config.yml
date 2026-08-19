@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: "🔒 보안 신고 / Security report"
+    url: "https://github.com/gay00ung/aargrade/security/policy"
+    about: "토큰 노출, 임의 파일 변경 등 보안 문제는 비공개 절차로 신고해 주세요."

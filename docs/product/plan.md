@@ -31,7 +31,12 @@
   and Windows archives, verify their contents and embedded version, publish
   SHA-256 checksums, and create a GitHub prerelease or stable release.
   [`v0.1.0-beta.1`](https://github.com/gay00ung/aargrade/releases/tag/v0.1.0-beta.1)
-  is published as the first public beta.
+  was the first public beta. [`v0.1.0-beta.2`](https://github.com/gay00ung/aargrade/releases/tag/v0.1.0-beta.2)
+  adds the Adjust-driven Groovy migration and pre-existing root-failure
+  isolation work.
+- Korean and English beta runbooks plus structured validation and bug forms are
+  published. Qualifying external-maintainer reports are tracked separately from
+  author-run public-repository dogfood.
 - Upgrade Assistant Gates A and C passed in a controlled A→B→A experiment:
   Android Studio could not obtain an application project in the library-only
   baseline, loaded an AGP 7.4.2 migration plan after `host add`, and returned

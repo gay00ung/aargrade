@@ -364,6 +364,12 @@ can continue the loop.
   executed as `aargrade v0.1.0-beta.1`. A separate temporary
   `go install github.com/gay00ung/aargrade/cmd/aargrade@v0.1.0-beta.1` also
   reported the same version.
+- The `v0.1.0-beta.2` workflow repeated the quality gate, produced the same six
+  platform archives plus checksums, and published a GitHub prerelease on
+  2026-08-19. A fresh macOS arm64 download passed its published checksum,
+  reported `aargrade v0.1.0-beta.2`, and completed an upgrade preview against
+  the public example. A temporary `go install ...@v0.1.0-beta.2` reported the
+  same version.
 
 This validates the packaging and publication path. The GitHub Releases page
 and the tag-triggered workflow are the authoritative publication record.
