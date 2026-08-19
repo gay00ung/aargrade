@@ -93,6 +93,15 @@ func transformLiteralAGP(content, current, target string) (string, int) {
 		result, count = replaceCleanGroup(result, pattern, 1, current, target)
 		total += count
 	}
+	for _, variable := range project.FindAGPBuildscriptVariables(result) {
+		if variable.Value != current {
+			continue
+		}
+		pattern := regexp.MustCompile(`(?m)^\s*(?:ext\.)?` + regexp.QuoteMeta(variable.Name) + `\s*=\s*["']([^"']+)["']\s*$`)
+		var count int
+		result, count = replaceCleanGroup(result, pattern, 1, current, target)
+		total += count
+	}
 	return result, total
 }
 
@@ -103,6 +112,9 @@ func literalAGPVersions(content string) []string {
 		for _, match := range pattern.FindAllStringSubmatch(clean, -1) {
 			result = append(result, match[1])
 		}
+	}
+	for _, variable := range project.FindAGPBuildscriptVariables(content) {
+		result = append(result, variable.Value)
 	}
 	return sortAndUniqueStrings(result)
 }

@@ -16,21 +16,23 @@ const maxBuildFileSize = 4 << 20
 var errAmbiguousBuildFiles = errors.New("ambiguous Gradle build files")
 
 var (
-	quotedGradlePathPattern    = regexp.MustCompile(`["'](:?[A-Za-z0-9_.-]+(?::[A-Za-z0-9_.-]+)*)["']`)
-	includeCallPattern         = regexp.MustCompile(`(?m)\binclude\s*\(([^)]*)\)`)
-	includeStatementPattern    = regexp.MustCompile(`(?m)^\s*include\s+([^\n]+)$`)
-	projectDirPattern          = regexp.MustCompile(`(?m)project\s*\(\s*["'](:[^"']+)["']\s*\)\s*\.projectDir\s*=\s*file\s*\(\s*["']([^"']+)["']\s*\)`)
-	projectDirGroovyPattern    = regexp.MustCompile(`(?m)project\s*\(\s*["'](:[^"']+)["']\s*\)\s*\.projectDir\s*=\s*file\s+["']([^"']+)["']`)
-	wrapperVersionPattern      = regexp.MustCompile(`gradle-([0-9][0-9A-Za-z.+-]*)-(?:bin|all)\.zip`)
-	pluginIDCallPattern        = regexp.MustCompile(`\bid\s*\(\s*["']([^"']+)["']\s*\)`)
-	pluginIDGroovyPattern      = regexp.MustCompile(`\bid\s+["']([^"']+)["']`)
-	applyPluginCallPattern     = regexp.MustCompile(`\bapply\s*\(\s*plugin\s*=\s*["']([^"']+)["']\s*\)`)
-	applyPluginGroovyPattern   = regexp.MustCompile(`\bapply\s+plugin\s*:\s*["']([^"']+)["']`)
-	pluginAliasPattern         = regexp.MustCompile(`\balias\s*\(\s*libs\.plugins\.([A-Za-z0-9_.-]+)\s*\)`)
-	applyFalsePattern          = regexp.MustCompile(`\bapply\s*(?:\(\s*)?false\b`)
-	pluginVersionCallPattern   = regexp.MustCompile(`(?s)\bid\s*\(\s*["'](com\.android\.(?:application|library))["']\s*\)\s*version\s*["']([^"']+)["']`)
-	pluginVersionGroovyPattern = regexp.MustCompile(`(?m)\bid\s+["'](com\.android\.(?:application|library))["']\s+version\s+["']([^"']+)["']`)
-	classpathAGPPattern        = regexp.MustCompile(`com\.android\.tools\.build:gradle:([0-9][0-9A-Za-z.+-]*)`)
+	quotedGradlePathPattern        = regexp.MustCompile(`["'](:?[A-Za-z0-9_.-]+(?::[A-Za-z0-9_.-]+)*)["']`)
+	includeCallPattern             = regexp.MustCompile(`(?m)\binclude\s*\(([^)]*)\)`)
+	includeStatementPattern        = regexp.MustCompile(`(?m)^\s*include\s+([^\n]+)$`)
+	projectDirPattern              = regexp.MustCompile(`(?m)project\s*\(\s*["'](:[^"']+)["']\s*\)\s*\.projectDir\s*=\s*file\s*\(\s*["']([^"']+)["']\s*\)`)
+	projectDirGroovyPattern        = regexp.MustCompile(`(?m)project\s*\(\s*["'](:[^"']+)["']\s*\)\s*\.projectDir\s*=\s*file\s+["']([^"']+)["']`)
+	wrapperVersionPattern          = regexp.MustCompile(`gradle-([0-9][0-9A-Za-z.+-]*)-(?:bin|all)\.zip`)
+	pluginIDCallPattern            = regexp.MustCompile(`\bid\s*\(\s*["']([^"']+)["']\s*\)`)
+	pluginIDGroovyPattern          = regexp.MustCompile(`\bid\s+["']([^"']+)["']`)
+	applyPluginCallPattern         = regexp.MustCompile(`\bapply\s*\(\s*plugin\s*=\s*["']([^"']+)["']\s*\)`)
+	applyPluginGroovyPattern       = regexp.MustCompile(`\bapply\s+plugin\s*:\s*["']([^"']+)["']`)
+	pluginAliasPattern             = regexp.MustCompile(`\balias\s*\(\s*libs\.plugins\.([A-Za-z0-9_.-]+)\s*\)`)
+	applyFalsePattern              = regexp.MustCompile(`\bapply\s*(?:\(\s*)?false\b`)
+	pluginVersionCallPattern       = regexp.MustCompile(`(?s)\bid\s*\(\s*["'](com\.android\.(?:application|library))["']\s*\)\s*version\s*["']([^"']+)["']`)
+	pluginVersionGroovyPattern     = regexp.MustCompile(`(?m)\bid\s+["'](com\.android\.(?:application|library))["']\s+version\s+["']([^"']+)["']`)
+	classpathAGPPattern            = regexp.MustCompile(`com\.android\.tools\.build:gradle:([0-9][0-9A-Za-z.+-]*)`)
+	classpathAGPVariablePattern    = regexp.MustCompile(`["']com\.android\.tools\.build:gradle:\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))["']`)
+	gradleLiteralAssignmentPattern = regexp.MustCompile(`(?m)^\s*(?:ext\.)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*["']([0-9][0-9A-Za-z.+-]*)["']\s*$`)
 )
 
 type Plugin struct {
@@ -78,6 +80,17 @@ type VersionEvidence struct {
 	Path   string
 	Line   int
 	Source string
+}
+
+// AGPBuildscriptVariable is a literal Gradle variable whose string
+// interpolations are confined to the exact version segment of an Android
+// Gradle plugin buildscript classpath. Keeping this representation deliberately
+// narrow lets callers recognize common Groovy ext variables without evaluating
+// arbitrary Gradle code.
+type AGPBuildscriptVariable struct {
+	Name  string
+	Value string
+	Line  int
 }
 
 type Project struct {
@@ -404,6 +417,9 @@ func collectAGPVersions(project *Project, catalog Catalog) []VersionEvidence {
 				add(value, file.path, lineAt(clean, index[0]), "literal")
 			}
 		}
+		for _, variable := range FindAGPBuildscriptVariables(file.content) {
+			add(variable.Value, file.path, variable.Line, "buildscript-variable")
+		}
 	}
 	for _, plugin := range catalog.Plugins {
 		if (plugin.ID == "com.android.application" || plugin.ID == "com.android.library") && plugin.Version != "" {
@@ -425,6 +441,69 @@ func collectAGPVersions(project *Project, catalog Catalog) []VersionEvidence {
 		return result[i].Line < result[j].Line
 	})
 	return result
+}
+
+// FindAGPBuildscriptVariables resolves the conservative Groovy pattern used by
+// projects such as:
+//
+//	ext { agp_version = '9.2.1' }
+//	classpath "com.android.tools.build:gradle:$agp_version"
+//
+// A variable is returned only when it has one literal assignment and every
+// interpolation of that variable is an AGP classpath version. Dynamic,
+// reassigned, or shared variables intentionally remain unresolved.
+func FindAGPBuildscriptVariables(content string) []AGPBuildscriptVariable {
+	clean := StripComments(content)
+	assignments := map[string][]AGPBuildscriptVariable{}
+	for _, match := range gradleLiteralAssignmentPattern.FindAllStringSubmatchIndex(clean, -1) {
+		name := clean[match[2]:match[3]]
+		value := clean[match[4]:match[5]]
+		assignments[name] = append(assignments[name], AGPBuildscriptVariable{
+			Name: name, Value: value, Line: lineAt(clean, match[0]),
+		})
+	}
+
+	agpReferences := map[string]int{}
+	for _, match := range classpathAGPVariablePattern.FindAllStringSubmatchIndex(clean, -1) {
+		name := ""
+		if match[2] >= 0 {
+			name = clean[match[2]:match[3]]
+		} else if match[4] >= 0 {
+			name = clean[match[4]:match[5]]
+		}
+		if name != "" {
+			agpReferences[name]++
+		}
+	}
+
+	var result []AGPBuildscriptVariable
+	for name, agpReferenceCount := range agpReferences {
+		values := assignments[name]
+		if len(values) != 1 || countGradleAssignments(clean, name) != 1 {
+			continue
+		}
+		if countGradleInterpolations(clean, name) != agpReferenceCount {
+			continue
+		}
+		result = append(result, values[0])
+	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].Line != result[j].Line {
+			return result[i].Line < result[j].Line
+		}
+		return result[i].Name < result[j].Name
+	})
+	return result
+}
+
+func countGradleAssignments(content, name string) int {
+	pattern := regexp.MustCompile(`(?m)^\s*(?:ext\.)?` + regexp.QuoteMeta(name) + `\s*=`)
+	return len(pattern.FindAllStringIndex(content, -1))
+}
+
+func countGradleInterpolations(content, name string) int {
+	pattern := regexp.MustCompile(`\$(?:\{` + regexp.QuoteMeta(name) + `\}|` + regexp.QuoteMeta(name) + `\b)`)
+	return len(pattern.FindAllStringIndex(content, -1))
 }
 
 func readDefaultCatalog(root string) (Catalog, error) {

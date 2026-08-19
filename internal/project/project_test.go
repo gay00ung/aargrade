@@ -100,6 +100,49 @@ plugins {
 	}
 }
 
+func TestFindAGPBuildscriptVariables(t *testing.T) {
+	variables := FindAGPBuildscriptVariables(`
+buildscript {
+    ext {
+        agp_version = '9.2.1'
+        kotlin_version = '2.0.21'
+    }
+    dependencies {
+        classpath "com.android.tools.build:gradle:$agp_version"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+`)
+	if len(variables) != 1 || variables[0].Name != "agp_version" || variables[0].Value != "9.2.1" || variables[0].Line != 4 {
+		t.Fatalf("variables = %#v", variables)
+	}
+}
+
+func TestFindAGPBuildscriptVariablesRejectsSharedOrReassignedValues(t *testing.T) {
+	for name, content := range map[string]string{
+		"shared": `
+agp_version = '9.2.1'
+classpath "com.android.tools.build:gradle:${agp_version}"
+implementation "example:unrelated:$agp_version"
+`,
+		"reassigned": `
+agp_version = '9.2.1'
+agp_version = providers.gradleProperty('agp')
+classpath "com.android.tools.build:gradle:$agp_version"
+`,
+		"coordinate suffix": `
+agp_version = '9.2.1'
+classpath "com.android.tools.build:gradle:$agp_version-custom"
+`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if variables := FindAGPBuildscriptVariables(content); len(variables) != 0 {
+				t.Fatalf("variables = %#v, want none", variables)
+			}
+		})
+	}
+}
+
 func fixturePath(t *testing.T, name string) string {
 	t.Helper()
 	path, err := filepath.Abs(filepath.Join("..", "..", "testdata", "projects", name))

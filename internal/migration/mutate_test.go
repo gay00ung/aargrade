@@ -655,6 +655,49 @@ buildscript {
 	}
 }
 
+func TestMigrateGroovyBuildscriptAGPVariable(t *testing.T) {
+	root := copyMigrationFixture(t, "groovy-mixed")
+	buildPath := filepath.Join(root, "build.gradle")
+	content := `buildscript {
+    ext {
+        agp_version = '7.4.2'
+        kotlin_version = '1.8.22'
+    }
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath "com.android.tools.build:gradle:$agp_version"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+`
+	if err := os.WriteFile(buildPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := Migrate(MutationOptions{ProjectPath: root, TargetAGP: "7.4.3", Apply: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Ready || !result.Applied || result.CurrentAGP != "7.4.2" {
+		t.Fatalf("result = %#v", result)
+	}
+	after := readMigrationTestFile(t, buildPath)
+	if !strings.Contains(after, "agp_version = '7.4.3'") || !strings.Contains(after, "kotlin_version = '1.8.22'") ||
+		!strings.Contains(after, "gradle:$agp_version") {
+		t.Fatalf("unexpected buildscript migration:\n%s", after)
+	}
+	discovered, err := project.Discover(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := uniqueProjectVersions(discovered.AGPVersions); !reflect.DeepEqual(got, []string{"7.4.3"}) {
+		t.Fatalf("AGP versions = %v", got)
+	}
+}
+
 func TestValidateMigrationStateRejectsNonGradleOwnedPath(t *testing.T) {
 	root := t.TempDir()
 	content := []byte("do not overwrite")
