@@ -1,7 +1,7 @@
 GO ?= go
 GRADLE ?= ./examples/library-only/gradlew
 VERSION ?= dev
-RELEASE_VERSION ?= v0.1.0-beta.1
+RELEASE_VERSION ?= v0.1.0-beta.2
 RELEASE_DIR ?= dist/$(RELEASE_VERSION)
 
 .PHONY: build test test-race test-upgrade-assistant-fixture test-migration-smoke test-upgrade-agent-smoke test-external vet vuln demo check release release-check example-build example-verify

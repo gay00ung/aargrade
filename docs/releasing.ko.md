@@ -32,23 +32,23 @@ make release-check
 실제 배포할 버전 이름으로 산출물을 보고 싶다면 다음을 실행합니다.
 
 ```bash
-make release RELEASE_VERSION=v0.1.0-beta.1
-ls dist/v0.1.0-beta.1
+make release RELEASE_VERSION=v0.1.0-beta.2
+ls dist/v0.1.0-beta.2
 ```
 
 `make release`는 GitHub에 아무것도 올리지 않습니다.
 
 ## 베타 배포
 
-태그는 SemVer와 `v` 접두사를 사용합니다. 첫 베타는
-`v0.1.0-beta.1`, 다음 수정 베타는 `v0.1.0-beta.2`처럼 올립니다.
+태그는 SemVer와 `v` 접두사를 사용합니다. 이미 배포된 태그는 옮기지 않고
+`v0.1.0-beta.1`, `v0.1.0-beta.2`처럼 번호를 올립니다.
 
 ```bash
 git switch main
 git pull --ff-only
 git status --short
-git tag -a v0.1.0-beta.1 -m "AARGrade v0.1.0-beta.1"
-git push origin v0.1.0-beta.1
+git tag -a v0.1.0-beta.2 -m "AARGrade v0.1.0-beta.2"
+git push origin v0.1.0-beta.2
 ```
 
 태그가 푸시되면 `.github/workflows/release.yml`이 다음 순서로 동작합니다.
@@ -64,7 +64,7 @@ git push origin v0.1.0-beta.1
 
 ```bash
 gh run list --workflow Release --limit 5
-gh release view v0.1.0-beta.1
+gh release view v0.1.0-beta.2
 ```
 
 ## 안정 버전 배포

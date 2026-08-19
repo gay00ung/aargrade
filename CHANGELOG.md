@@ -5,6 +5,8 @@ Versioning while its public interfaces are still in beta.
 
 ## [Unreleased]
 
+## [0.1.0-beta.2] - 2026-08-19
+
 ### Added
 
 - Compare whole-project Gradle dry-run evidence before and after an applied
@@ -54,5 +56,6 @@ Versioning while its public interfaces are still in beta.
 - Keep RefreshVersions, arbitrary Gradle expressions, convention-plugin
   internals, legacy Variant APIs, and other ambiguous changes fail-closed.
 
-[Unreleased]: https://github.com/gay00ung/aargrade/compare/v0.1.0-beta.1...HEAD
+[Unreleased]: https://github.com/gay00ung/aargrade/compare/v0.1.0-beta.2...HEAD
+[0.1.0-beta.2]: https://github.com/gay00ung/aargrade/compare/v0.1.0-beta.1...v0.1.0-beta.2
 [0.1.0-beta.1]: https://github.com/gay00ung/aargrade/releases/tag/v0.1.0-beta.1

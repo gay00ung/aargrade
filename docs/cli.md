@@ -9,7 +9,7 @@ requested verdict could not be produced reliably.
 
 ```bash
 aargrade version
-# aargrade v0.1.0-beta.1
+# aargrade v0.1.0-beta.2
 ```
 
 Tagged release binaries receive the exact tag at link time. A binary installed

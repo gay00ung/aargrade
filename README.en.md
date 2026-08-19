@@ -75,11 +75,11 @@ Download the archive for your OS and CPU from
 | Windows x86-64 | `aargrade_<VERSION>_windows_amd64.zip` |
 | Windows ARM64 | `aargrade_<VERSION>_windows_arm64.zip` |
 
-The first public beta is `v0.1.0-beta.1`. An Apple Silicon installation looks
+The latest public beta is `v0.1.0-beta.2`. An Apple Silicon installation looks
 like:
 
 ```bash
-AARGRADE_VERSION=v0.1.0-beta.1
+AARGRADE_VERSION=v0.1.0-beta.2
 AARGRADE_ASSET="aargrade_${AARGRADE_VERSION#v}_darwin_arm64"
 curl -fLO "https://github.com/gay00ung/aargrade/releases/download/${AARGRADE_VERSION}/${AARGRADE_ASSET}.tar.gz"
 curl -fLO "https://github.com/gay00ung/aargrade/releases/download/${AARGRADE_VERSION}/checksums.txt"
@@ -95,7 +95,7 @@ under `third_party_licenses`.
 With Go 1.25 or newer, install the exact tag instead:
 
 ```bash
-go install github.com/gay00ung/aargrade/cmd/aargrade@v0.1.0-beta.1
+go install github.com/gay00ung/aargrade/cmd/aargrade@v0.1.0-beta.2
 export PATH="$(go env GOPATH)/bin:$PATH"
 aargrade version
 ```

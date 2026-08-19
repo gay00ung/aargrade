@@ -94,11 +94,11 @@ CPU에 맞는 파일을 받습니다.
 | 일반 64비트 Windows | `aargrade_<VERSION>_windows_amd64.zip` |
 | ARM64 Windows | `aargrade_<VERSION>_windows_arm64.zip` |
 
-첫 공개 베타 `v0.1.0-beta.1`을 Apple Silicon Mac에 설치하는 예시는 다음과
+최신 공개 베타 `v0.1.0-beta.2`를 Apple Silicon Mac에 설치하는 예시는 다음과
 같습니다.
 
 ```bash
-AARGRADE_VERSION=v0.1.0-beta.1
+AARGRADE_VERSION=v0.1.0-beta.2
 AARGRADE_ASSET="aargrade_${AARGRADE_VERSION#v}_darwin_arm64"
 curl -fLO "https://github.com/gay00ung/aargrade/releases/download/${AARGRADE_VERSION}/${AARGRADE_ASSET}.tar.gz"
 curl -fLO "https://github.com/gay00ung/aargrade/releases/download/${AARGRADE_VERSION}/checksums.txt"
@@ -118,7 +118,7 @@ aargrade version
 Go 1.25 이상이 있다면 버전을 명시해 설치할 수도 있습니다.
 
 ```bash
-go install github.com/gay00ung/aargrade/cmd/aargrade@v0.1.0-beta.1
+go install github.com/gay00ung/aargrade/cmd/aargrade@v0.1.0-beta.2
 export PATH="$(go env GOPATH)/bin:$PATH"
 aargrade version
 ```

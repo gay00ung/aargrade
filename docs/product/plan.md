@@ -238,3 +238,24 @@ to handle those project-specific cases before rerunning the same operation.
 - A consumer matrix requires redistribution or licensing terms incompatible
   with the intended open-source distribution.
 - A registry or trademark conflict makes the AARGrade name unsafe.
+
+## v1.0 graduation criteria
+
+`v1.0.0` is a compatibility promise, not a scheduled date. The stable tag is
+ready when all of the following are true:
+
+1. At least three external Android SDK or AAR maintainers complete a real
+   preview/apply/rollback or consumer-matrix run and their blocking feedback is
+   resolved or documented.
+2. The supported AGP, Gradle, JDK, Groovy/Kotlin DSL, and consumer-cell boundary
+   is explicit; unsupported dynamic build logic continues to fail closed.
+3. No known critical defect can leave an owned migration partially applied,
+   delete user-owned content, or report a false compatibility pass.
+4. CLI flags, exit-code meanings, configuration schema 1, and report schema 1
+   are stable enough to preserve through the `v1.x` line.
+5. Installation, upgrade, rollback, CI, and MCP paths are reproducible from the
+   Korean and English documentation using published binaries.
+
+Until these gates pass, fixes and compatibility recipes ship as incremented
+`v0.1.0-beta.N` releases. The future Gradle plugin is not a blocker for v1; it
+remains an adapter added only when external users demonstrate demand.

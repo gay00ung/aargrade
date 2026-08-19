@@ -32,10 +32,10 @@ make release-check
 To inspect assets with the intended version without publishing anything:
 
 ```bash
-make release RELEASE_VERSION=v0.1.0-beta.1
+make release RELEASE_VERSION=v0.1.0-beta.2
 ```
 
-The files are written under `dist/v0.1.0-beta.1`.
+The files are written under `dist/v0.1.0-beta.2`.
 
 ## Publish a beta
 
@@ -46,8 +46,8 @@ moving a published tag.
 git switch main
 git pull --ff-only
 git status --short
-git tag -a v0.1.0-beta.1 -m "AARGrade v0.1.0-beta.1"
-git push origin v0.1.0-beta.1
+git tag -a v0.1.0-beta.2 -m "AARGrade v0.1.0-beta.2"
+git push origin v0.1.0-beta.2
 ```
 
 `.github/workflows/release.yml` then:
@@ -62,7 +62,7 @@ Inspect it with:
 
 ```bash
 gh run list --workflow Release --limit 5
-gh release view v0.1.0-beta.1
+gh release view v0.1.0-beta.2
 ```
 
 ## Publish stable
